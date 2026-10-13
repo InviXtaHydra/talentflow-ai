@@ -1,0 +1,82 @@
+# TalentFlow AI — the whole platform:   docker compose up --build
+#   http://localhost:3300        web app (Next.js; forwards /api to the backend)
+#   http://localhost:8300/docs   API documentation (Swagger UI, development only)
+#   http://localhost:8325        Mailpit: every e-mail the app sends in development
+# The language model runs in Ollama on the host machine (see README).
+name: talentflow
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5436:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:8325:8025"
+
+  api:
+    build:
+      context: ./backend
+      args:
+        INSTALL_DEV: "true"
+    env_file: .env
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
+    ports:
+      - "127.0.0.1:8300:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_DEV: "true"
+    env_file: .env
+    command: python -m app.workers.runner
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      api:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_INTERNAL_URL: http://api:8000
+    environment:
+      BACKEND_INTERNAL_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3300:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  storage:

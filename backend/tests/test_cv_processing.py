@@ -1,0 +1,163 @@
+import io
+
+from pypdf import PdfReader
+
+from app.integrations.storage.local import get_storage
+from app.models.entities import CVDocument
+from app.schemas.profile import ContactDetails, ExtractedCV, ProfileContent
+from tests.conftest import run_tasks
+from tests.helpers import sample_docx, sample_pdf
+
+
+def _upload(api, name: str, data: bytes, mime: str = "application/octet-stream"):
+    return api.client.post(
+        "/api/v1/cvs/upload", files={"file": (name, data, mime)}, headers={"X-CSRF-Token": api.client.cookies.get("tf_csrf")}
+    )
+
+
+def _fake_extraction(fake_ai) -> None:
+    def respond(system: str, user: str) -> ExtractedCV:
+        assert "Sanne Jacobs" in user  # the document text reached the model, delimited as data
+        assert "<document>" in user
+        return ExtractedCV(
+            language="nl",
+            contact=ContactDetails(full_name="Sanne Jacobs", email="sanne@example.com", city="Leuven"),
+            headline="Data analist",
+            summary="Data analist met ervaring in SQL.",
+            profile=ProfileContent.model_validate(
+                {
+                    "experiences": [
+                        {
+                            "id": "model-chosen-id",
+                            "title": "Data Analist",
+                            "employer": "Initech",
+                            "start": "2021-03",
+                            "is_current": True,
+                            "bullets": ["Bouwde Power BI-dashboards"],
+                        }
+                    ],
+                    "skills": ["SQL", "Power BI", "Excel"],
+                }
+            ),
+        )
+
+    fake_ai.structured[ExtractedCV] = respond
+
+
+def test_rejects_unsupported_and_disguised_files(candidate):
+    assert _upload(candidate, "cv.txt", b"hello world").status_code == 415
+    assert _upload(candidate, "cv.pdf", b"MZ\x90\x00 not really a pdf").status_code == 415
+    assert _upload(candidate, "cv.docx", sample_pdf()).status_code == 415  # extension doesn't match content
+    assert _upload(candidate, "cv.pdf", b"").status_code == 400
+    assert _upload(candidate, "cv.pdf", b"%PDF-" + b"0" * (6 * 1024 * 1024)).status_code == 413
+
+
+def test_pdf_upload_extract_review_confirm(candidate, fake_ai, db):
+    _fake_extraction(fake_ai)
+    response = _upload(candidate, "Mijn CV.pdf", sample_pdf(), "application/pdf")
+    assert response.status_code == 201, response.text
+    cv_id = response.json()["document"]["id"]
+    assert response.json()["document"]["extraction_status"] == "pending"
+
+    run_tasks()
+    detail = candidate.get(f"/cvs/{cv_id}").json()
+    assert detail["extraction_status"] == "completed"
+    assert detail["extraction_method"] == "ai"
+    extracted = detail["extracted"]
+    assert extracted["profile"]["experiences"][0]["id"] != "model-chosen-id"  # ids are never taken from the model
+    assert detail["confirmed_at"] is None
+
+    # The extraction is not applied to the profile until the candidate confirms it.
+    assert candidate.get("/candidates/me").json()["content"]["skills"] == []
+
+    extracted["profile"]["skills"].append("Python")  # the candidate corrects the extraction
+    confirm = candidate.post(
+        f"/cvs/{cv_id}/confirm",
+        {"contact": extracted["contact"], "headline": "Data analist", "summary": extracted["summary"], "profile": extracted["profile"]},
+    )
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["kind"] == "original"
+    profile = candidate.get("/candidates/me").json()
+    assert "Python" in profile["content"]["skills"]
+    assert profile["city"] == "Leuven"
+
+    # Stored privately under an opaque key, never under the original filename.
+    document = db.get(CVDocument, cv_id)
+    assert "Mijn" not in document.storage_key
+    original = candidate.client.get(f"/api/v1/cvs/{cv_id}/file")
+    assert original.status_code == 200 and original.content.startswith(b"%PDF")
+
+
+def test_docx_upload_and_rule_based_fallback_when_ai_is_down(candidate, fake_ai):
+    fake_ai.unavailable = True
+    response = _upload(candidate, "cv.docx", sample_docx())
+    assert response.status_code == 201
+    cv_id = response.json()["document"]["id"]
+    run_tasks()
+    detail = candidate.get(f"/cvs/{cv_id}").json()
+    # When the model is unreachable, the basic extraction is used and labelled as such.
+    assert detail["extraction_status"] == "completed"
+    assert detail["extraction_method"] == "rule_based"
+    assert "basisextractie" in detail["extraction_error"]
+    assert detail["extracted"]["contact"]["email"] == "sanne@example.com"
+
+
+def test_scanned_pdf_needs_ocr(candidate):
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer)
+    pdf.rect(50, 50, 200, 200, fill=1)  # only graphics, no text
+    pdf.save()
+    response = _upload(candidate, "scan.pdf", buffer.getvalue())
+    run_tasks()
+    detail = candidate.get(f"/cvs/{response.json()['document']['id']}").json()
+    assert detail["extraction_status"] == "needs_ocr"
+    assert "gescande" in detail["extraction_error"]
+
+
+def test_cv_isolation_and_deletion(candidate, fake_ai):
+    from tests.conftest import register
+
+    _fake_extraction(fake_ai)
+    cv_id = _upload(candidate, "cv.pdf", sample_pdf()).json()["document"]["id"]
+    other = register()
+    assert other.get(f"/cvs/{cv_id}").status_code == 404
+    assert other.client.get(f"/api/v1/cvs/{cv_id}/file").status_code == 404
+    assert other.delete(f"/cvs/{cv_id}").status_code == 404
+
+    assert candidate.delete(f"/cvs/{cv_id}").status_code == 200
+    assert candidate.get(f"/cvs/{cv_id}").status_code == 404
+
+
+def test_deleted_file_is_removed_from_storage(candidate, fake_ai, db):
+    _fake_extraction(fake_ai)
+    cv_id = _upload(candidate, "cv.pdf", sample_pdf()).json()["document"]["id"]
+    key = db.get(CVDocument, cv_id).storage_key
+    assert get_storage().read(key)
+    candidate.delete(f"/cvs/{cv_id}")
+    try:
+        get_storage().read(key)
+        raise AssertionError("file still exists")
+    except FileNotFoundError:
+        pass
+
+
+def test_rule_based_analysis_without_score_before_run(candidate, fake_ai):
+    from tests.conftest import fill_profile
+
+    fill_profile(candidate)
+    assert candidate.get("/cv-analyses").json() == []  # no score is invented before an analysis has run
+    fake_ai.unavailable = True
+    candidate.post("/cv-analyses")
+    run_tasks()
+    analyses = candidate.get("/cv-analyses").json()
+    assert len(analyses) == 1
+    assert 0 <= analyses[0]["quality_score"] <= 100
+    assert analyses[0]["status"] == "completed_without_ai"
+    assert any(not c["passed"] for c in analyses[0]["checks"])
+
+
+def test_generated_pdf_contains_text():
+    text = "".join(page.extract_text() for page in PdfReader(io.BytesIO(sample_pdf())).pages)
+    assert "Sanne Jacobs" in text and "Power BI" in text
