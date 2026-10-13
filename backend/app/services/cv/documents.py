@@ -23,6 +23,7 @@ from app.services.audit import audit
 from app.services.candidate_service import get_preferences, get_profile
 from app.services.cv import rule_based
 from app.services.cv.content import profile_to_cv_content
+from app.services.cv.llm_schema import LlmCV, to_extracted
 from app.services.cv.parsing import ExtractionError, detect_language, extract_text
 from app.utils.files import detect_cv_type
 from app.utils.text import content_hash
@@ -120,15 +121,11 @@ def _ai_extract(db: Session, user_id: uuid.UUID, text: str) -> ExtractedCV:
         operation="cv_extraction",
         system=CV_EXTRACTION,
         user=f"<document>\n{text[:20000]}\n</document>",
-        schema=ExtractedCV,
+        schema=LlmCV,
         temperature=0.0,
     )
-    # Fresh ids: never trust identifiers produced by the model.
-    data = result.model_dump(mode="json")
-    for section in ("experiences", "education", "certifications", "projects"):
-        for item in data["profile"][section]:
-            item.pop("id", None)
-    return ExtractedCV.model_validate(data)
+    # Converted to the internal model with fresh ids: identifiers are never taken from the model.
+    return to_extracted(result)
 
 
 def run_extraction(db: Session, cv_id: uuid.UUID, progress) -> None:

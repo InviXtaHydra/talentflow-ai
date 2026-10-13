@@ -70,17 +70,17 @@ class OptimizedBullet(BaseModel):
     text: str = Field(
         max_length=600, description="Rewritten statement: action verb first, relevant to the vacancy, only facts from the source"
     )
-    source_refs: list[str] = Field(default_factory=list, description="Ids of the profile items this statement is based on")
+    source_refs: list[str] = Field(description="Ids of the profile items this statement is based on")
 
 
 class OptimizedExperience(BaseModel):
     source_id: str = Field(description="The id of the experience in the profile")
-    bullets: list[OptimizedBullet] = Field(default_factory=list, description="Rewritten bullets for this experience, most relevant first")
+    bullets: list[OptimizedBullet] = Field(description="Rewritten bullets for this experience, most relevant first")
 
 
 class OptimizedProject(BaseModel):
     source_id: str
-    description: str | None = Field(default=None, max_length=800)
+    description: str | None = Field(max_length=800)
 
 
 class ChangeNote(BaseModel):
@@ -90,23 +90,28 @@ class ChangeNote(BaseModel):
 
 class CandidateQuestion(BaseModel):
     question: str = Field(max_length=400)
-    reason: str | None = Field(default=None, max_length=400)
+    reason: str | None = Field(max_length=400)
 
 
 class OptimizerOutput(BaseModel):
-    """The model may only rephrase, select and reorder. Names, employers, titles, dates, education
+    """All fields are required (lists may be empty) so small models fill them in instead of returning minimal JSON.
+
+    The model may only rephrase, select and reorder. Names, employers, titles, dates, education
     and contact details are copied from the source by the backend, not taken from this output."""
 
-    headline: str | None = Field(default=None, max_length=200, description="Short professional title supported by the profile")
-    summary: str = Field(max_length=2000, description="NEW 3-4 sentence summary written for this vacancy, using only profile facts")
-    summary_source_refs: list[str] = Field(default_factory=list)
-    experience_order: list[str] = Field(default_factory=list, description="Experience ids, most relevant for the vacancy first")
-    experiences: list[OptimizedExperience] = Field(default_factory=list, description="One entry for EVERY experience in the profile")
-    skills: list[str] = Field(default_factory=list, description="Profile skills only, most relevant for the vacancy first")
-    project_order: list[str] = Field(default_factory=list)
-    projects: list[OptimizedProject] = Field(default_factory=list)
-    emphasized_keywords: list[str] = Field(default_factory=list)
-    changes: list[ChangeNote] = Field(default_factory=list, description="What was changed and why, one note per change")
+    headline: str | None = Field(max_length=200, description="Short professional title supported by the profile")
+    summary: str = Field(
+        max_length=2000,
+        description="NEW 2-4 sentence CV profile for this kind of role, using only profile facts; no company name, no wish to apply",
+    )
+    summary_source_refs: list[str] = Field()
+    experience_order: list[str] = Field(description="Experience ids, most relevant for the vacancy first")
+    experiences: list[OptimizedExperience] = Field(description="One entry for EVERY experience in the profile")
+    skills: list[str] = Field(description="Profile skills only, most relevant for the vacancy first")
+    project_order: list[str] = Field()
+    projects: list[OptimizedProject] = Field()
+    emphasized_keywords: list[str] = Field()
+    changes: list[ChangeNote] = Field(description="What was changed and why, one note per change")
     questions: list[CandidateQuestion] = Field(
         default_factory=list, description="Questions for facts that would strengthen the CV but are missing"
     )

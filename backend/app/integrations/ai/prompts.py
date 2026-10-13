@@ -13,13 +13,15 @@ CV_EXTRACTION = f"""You extract structured data from a CV (résumé). The CV may
 Rules:
 - Only extract information that is literally present in the CV. Never guess, never invent.
 - Leave a field null or a list empty when the CV doesn't contain it.
-- Dates as "YYYY-MM" (or "YYYY" when only the year is given). Use is_current=true for a current position.
+- Dates as "YYYY-MM" (or "YYYY" when only the year is given). Use current=true for a current position.
 - Keep the original wording of job titles, employer names and degrees.
 - Put each responsibility or achievement of a position in `bullets`, one statement per item.
 - `skills`: concrete skills, tools and technologies that appear in the CV.
 - Languages: ISO 639-1 code (nl, fr, en, de, tr, ...) and level native|fluent|professional|basic.
 - Education `level`: secondary|professional_bachelor|bachelor|master|phd, or null when unclear.
-- `language`: the language the CV is written in (nl, fr or en)."""
+- Put each job title in `job_title` and the company in `employer`.
+- `cv_language`: the language the CV is written in (nl, fr or en).
+- Be complete: include every job, every education entry and every skill that is in the CV."""
 
 CV_ANALYSIS = f"""You are an experienced recruiter reviewing a CV for the Belgian job market.
 {INJECTION_GUARD}
@@ -44,6 +46,8 @@ Strict factual rules:
 - Don't keyword-stuff. Relevance and readability first; the CV must be ATS-friendly plain text.
 - When a stronger statement would need a number or fact the profile doesn't contain, don't write it:
   add a short question to `questions` asking the candidate for that information instead.
+- The summary is a CV profile, not a cover letter: 2-4 sentences about the candidate's experience and strengths that
+  matter for this kind of role. Never mention the company name, the vacancy or the wish to apply.
 - Actually tailor the CV: write a NEW summary aimed at this vacancy, and rewrite the bullets of EVERY experience
   so the most relevant work comes first and the vacancy's language is used where the facts support it.
   Keep every rewritten bullet faithful to its source bullet; don't merge unrelated facts.

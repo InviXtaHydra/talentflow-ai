@@ -83,3 +83,24 @@ def test_health_and_config():
     ready = api.get("/health/ready").json()
     assert ready["database"] == "ok" and ready["ai"]["configured"] is True
     assert "ai_api_key" not in api.get("/config").text
+
+
+def test_admin_endpoints_and_role_separation(db, candidate, employer):
+    from app.models.enums import UserRole
+    from app.services.auth_service import create_user
+    from tests.conftest import Api
+
+    create_user(db, email="admin@example.com", password=PASSWORD, full_name="Beheerder", role=UserRole.ADMIN, verified=True)
+    db.commit()
+    admin = Api()
+    assert admin.post("/auth/login", {"email": "admin@example.com", "password": PASSWORD}).status_code == 200
+    stats = admin.get("/admin/stats")
+    assert stats.status_code == 200, stats.text
+    assert stats.json()["users"]["candidate"] == 1
+    assert admin.get("/admin/users").json()["total"] == 3
+    assert admin.get("/admin/audit-logs").status_code == 200
+    # Blocking a user ends their sessions.
+    assert admin.patch(f"/admin/users/{candidate.user['id']}", {"is_active": False}).status_code == 200
+    assert candidate.get("/auth/me").status_code == 401
+    # Non-admins can't reach admin endpoints.
+    assert employer.get("/admin/stats").status_code == 403

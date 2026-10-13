@@ -31,6 +31,9 @@ def _output(**overrides) -> OptimizerOutput:
             {"section": "Werkervaring", "description": "Alles herschreven met Kubernetes"},
         ],
         "questions": [{"question": "Hoeveel API-calls per dag verwerkten je API's?", "reason": "Kwantificeren"}],
+        "summary_source_refs": ["exp-aaaa0001"],
+        "project_order": [],
+        "projects": [],
     }
     data.update(overrides)
     return OptimizerOutput.model_validate(data)

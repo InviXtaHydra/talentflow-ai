@@ -198,6 +198,7 @@ def _demo_output(source: CVContent, job: Job, gap: GapAnalysis) -> OptimizerOutp
     return OptimizerOutput(
         headline=source.headline,
         summary=source.summary or "",
+        summary_source_refs=[],
         experience_order=[e.source_id for e in experiences if e.source_id],
         experiences=[],
         skills=skills,
@@ -206,6 +207,7 @@ def _demo_output(source: CVContent, job: Job, gap: GapAnalysis) -> OptimizerOutp
             for p in sorted(source.projects, key=lambda p: relevance([p.name, p.description or "", *p.technologies]), reverse=True)
             if p.source_id
         ],
+        projects=[],
         emphasized_keywords=gap.matching_skills[:8],
         changes=[
             ChangeNote(section="experience", description="Werkervaring gesorteerd op relevantie voor deze vacature."),

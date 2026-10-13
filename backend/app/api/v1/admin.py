@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, func, literal_column, or_, select
 
 from app.api.deps import AdminUser, DbSession
 from app.core.errors import AppError, NotFoundError
@@ -45,12 +45,8 @@ def stats(db: DbSession, _: AdminUser) -> dict:
         .where(AIUsageRecord.created_at >= since)
         .group_by(AIUsageRecord.operation)
     ).all()
-    signups = db.execute(
-        select(func.date_trunc("day", User.created_at), func.count())
-        .where(User.created_at >= since)
-        .group_by(func.date_trunc("day", User.created_at))
-        .order_by(func.date_trunc("day", User.created_at))
-    ).all()
+    day = func.date_trunc(literal_column("'day'"), User.created_at).label("day")
+    signups = db.execute(select(day, func.count()).where(User.created_at >= since).group_by(day).order_by(day)).all()
     return {
         "users": {role.value: n for role, n in users_by_role.items()},
         "companies": count(Company),

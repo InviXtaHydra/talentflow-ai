@@ -18,8 +18,8 @@ from app.services import ai_service
 
 
 class AIFeedback(BaseModel):
-    strengths: list[str] = Field(default_factory=list, max_length=6)
-    suggestions: list[str] = Field(default_factory=list, max_length=8)
+    strengths: list[str] = Field(max_length=6, description="2-5 concrete strengths visible in the CV")
+    suggestions: list[str] = Field(max_length=8, description="3-7 concrete improvements")
 
 
 def rule_checks(profile: CandidateProfile, user: User) -> list[dict]:
