@@ -88,3 +88,28 @@ def text_mentions_skill(text: str, canonical: str) -> bool:
         if re.search(pattern, haystack):
             return True
     return False
+
+
+_SPLIT = re.compile(r"\s*(?:[,;|•·]|\s/\s|\s&\s|\s+(?:en|and|et)\s+)\s*", re.IGNORECASE)
+
+
+def split_skills(values: list[str]) -> list[str]:
+    """Splits grouped entries like "Angular, Vue.js, React" or "SCRUM, Jira & Confluence" into single skills,
+    keeping the original order and dropping duplicates."""
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        for part in _SPLIT.split(value):
+            part = part.strip(" -–()")
+            key = normalize_skill(part)
+            if part and len(part) <= 60 and key not in seen:
+                seen.add(key)
+                result.append(part)
+    return result
+
+
+_INTERNSHIP = re.compile(r"\b(stage|stagiair|stagiaire|intern|internship|trainee|werkplekleren)\b", re.IGNORECASE)
+
+
+def looks_like_internship(*texts: str | None) -> bool:
+    return any(t and _INTERNSHIP.search(t) for t in texts)

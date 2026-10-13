@@ -20,7 +20,7 @@ from app.schemas.cv import (
     OptimizerOutput,
     ReviewItem,
 )
-from app.utils.skills import _SYNONYMS, normalize_skill, text_mentions_skill
+from app.utils.skills import _SYNONYMS, normalize_skill, split_skills, text_mentions_skill
 from app.utils.text import numbers_in
 
 
@@ -47,7 +47,7 @@ def build_index(source: CVContent) -> SourceIndex:
         if c.source_id:
             texts[c.source_id] = " ".join([c.name, c.issuer or "", str(c.year or "")])
     all_text = " ".join([source.headline or "", source.summary or "", *texts.values(), *source.skills])
-    skill_keys = {normalize_skill(s) for s in source.skills}
+    skill_keys = {normalize_skill(s) for s in split_skills(source.skills)}
     skill_keys |= {normalize_skill(t) for p in source.projects for t in p.technologies}
     return SourceIndex(cv=source, texts=texts, all_text=all_text, skill_keys=skill_keys)
 
@@ -111,7 +111,8 @@ def assemble(source: CVContent, output: OptimizerOutput, job_skills: list[str]) 
     # Skills: only what the profile supports, model's order first.
     skills: list[str] = []
     seen: set[str] = set()
-    display = {normalize_skill(s): s for s in source.skills}
+    source_skills = split_skills(source.skills)
+    display = {normalize_skill(s): s for s in source_skills}
     for p in source.projects:
         for t in p.technologies:
             display.setdefault(normalize_skill(t), t)
@@ -124,7 +125,7 @@ def assemble(source: CVContent, output: OptimizerOutput, job_skills: list[str]) 
             seen.add(key)
         else:
             review.append(ReviewItem(kind="skill", section="skills", text=name, reason="Deze vaardigheid staat niet in je profiel."))
-    skills += [s for s in source.skills if normalize_skill(s) not in seen]
+    skills += [s for s in source_skills if normalize_skill(s) not in seen]
 
     # Summary and headline: kept only when they add no unsupported facts.
     summary = output.summary.strip() if output.summary else source.summary

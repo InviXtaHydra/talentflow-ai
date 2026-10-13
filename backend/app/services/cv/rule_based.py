@@ -7,6 +7,7 @@ as a basic extraction in the UI; nothing is guessed."""
 import re
 
 from app.schemas.profile import ContactDetails, ExtractedCV, LanguageSkill, ProfileContent
+from app.utils.skills import split_skills
 
 _SECTION_HEADINGS = {
     "skills": ["vaardigheden", "competenties", "skills", "compétences", "competences", "technische vaardigheden", "kennis", "tools"],
@@ -104,5 +105,5 @@ def extract(text: str, language: str | None) -> ExtractedCV:
             linkedin_url=linkedin.group(0) if linkedin else None,
         ),
         summary=" ".join(summary_lines) or None,
-        profile=ProfileContent(skills=skills[:60], languages=languages),
+        profile=ProfileContent(skills=split_skills(skills)[:60], languages=languages),
     )

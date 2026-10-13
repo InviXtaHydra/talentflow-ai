@@ -8,6 +8,7 @@ from app.api.deps import CandidateUser, DbSession
 from app.core.config import get_settings
 from app.core.errors import AppError, NotFoundError
 from app.models.entities import CVAnalysis
+from app.models.enums import ExtractionStatus
 from app.schemas.common import Message, TaskRef
 from app.schemas.cvs import (
     ConfirmExtractionRequest,
@@ -82,6 +83,9 @@ def confirm(cv_id: uuid.UUID, body: ConfirmExtractionRequest, db: DbSession, use
 @router.post("/cvs/{cv_id}/retry-extraction", response_model=TaskRef)
 def retry_extraction(cv_id: uuid.UUID, db: DbSession, user: CandidateUser) -> TaskRef:
     document = documents.get_document(db, user, cv_id)
+    # Show "processing" right away, so the review page doesn't briefly display the previous result.
+    document.extraction_status = ExtractionStatus.PENDING
+    document.extraction_error = None
     task = tasks.enqueue(
         db,
         "extract_cv",

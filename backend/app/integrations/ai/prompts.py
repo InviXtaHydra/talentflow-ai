@@ -13,7 +13,9 @@ CV_EXTRACTION = f"""You extract structured data from a CV (résumé). The CV may
 Rules:
 - Only extract information that is literally present in the CV. Never guess, never invent.
 - Leave a field null or a list empty when the CV doesn't contain it.
-- Dates as "YYYY-MM" (or "YYYY" when only the year is given). Use current=true for a current position.
+- Copy dates exactly as written in the CV, including the month (e.g. "Sep 2024"). Use current=true for a current position.
+- Set internship=true for internships (stage, stagiair, intern, trainee).
+- List skills one per item: split grouped lines like "Angular, Vue.js, React" into separate skills.
 - Keep the original wording of job titles, employer names and degrees.
 - Put each responsibility or achievement of a position in `bullets`, one statement per item.
 - `skills`: concrete skills, tools and technologies that appear in the CV.

@@ -79,10 +79,13 @@ export function ExperienceEditor({ value, onChange }: { value: Experience[]; onC
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Functietitel"><Input value={exp.title} onChange={(e) => update(i, { title: e.target.value })} /></Field>
             <Field label="Werkgever"><Input value={exp.employer} onChange={(e) => update(i, { employer: e.target.value })} /></Field>
-            <Field label="Van" hint="JJJJ-MM"><Input value={exp.start ?? ""} placeholder="2021-03" onChange={(e) => update(i, { start: e.target.value || null })} /></Field>
+            <Field label="Van" hint={exp.start && exp.start.length === 4 ? "Vul ook de maand in (JJJJ-MM) voor een exacte telling" : "JJJJ-MM"}><Input value={exp.start ?? ""} placeholder="2021-03" onChange={(e) => update(i, { start: e.target.value || null })} /></Field>
             <Field label="Tot" hint="JJJJ-MM"><Input value={exp.end ?? ""} placeholder="2023-06" disabled={exp.is_current} onChange={(e) => update(i, { end: e.target.value || null })} /></Field>
             <Field label="Locatie"><Input value={exp.location ?? ""} onChange={(e) => update(i, { location: e.target.value || null })} /></Field>
-            <div className="flex items-end pb-2"><Checkbox checked={exp.is_current} onChange={(e) => update(i, { is_current: e.target.checked, end: e.target.checked ? null : exp.end })} label="Ik werk hier nog" /></div>
+            <div className="flex flex-wrap items-end gap-x-5 gap-y-2 pb-2">
+              <Checkbox checked={exp.is_current} onChange={(e) => update(i, { is_current: e.target.checked, end: e.target.checked ? null : exp.end })} label="Ik werk hier nog" />
+              <Checkbox checked={!!exp.is_internship} onChange={(e) => update(i, { is_internship: e.target.checked })} label="Dit was een stage" />
+            </div>
           </div>
           <div className="mt-3">
             <p className="mb-1.5 text-sm font-medium text-text-2">Taken en resultaten</p>

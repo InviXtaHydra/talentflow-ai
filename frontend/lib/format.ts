@@ -45,6 +45,15 @@ export function period(start?: string | null, end?: string | null, current?: boo
   return [from, to].filter(Boolean).join(" – ");
 }
 
+/** 14 → "1 jaar en 2 maanden", 6 → "6 maanden". */
+export function formatMonths(months: number): string {
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  const y = years ? `${years} jaar` : "";
+  const m = rest ? `${rest} ${rest === 1 ? "maand" : "maanden"}` : "";
+  return [y, m].filter(Boolean).join(" en ") || "0 maanden";
+}
+
 export function fileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;

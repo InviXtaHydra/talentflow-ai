@@ -9,15 +9,17 @@ Small local models fill flat schemas with descriptions far more reliably than th
 from pydantic import BaseModel, Field
 
 from app.schemas.profile import ContactDetails, ExtractedCV, LanguageSkill, ProfileContent
+from app.utils.skills import looks_like_internship, split_skills
 
 
 class LlmExperience(BaseModel):
     job_title: str = Field(description="Job title exactly as written")
     employer: str = Field(description="Company or organisation name")
     location: str | None = Field(description="City, if mentioned")
-    start: str | None = Field(description="Start date as YYYY-MM or YYYY")
-    end: str | None = Field(description="End date as YYYY-MM or YYYY; null if current")
+    start: str | None = Field(description="Start date copied exactly as written in the CV, e.g. 'Sep 2024' or '03/2021'")
+    end: str | None = Field(description="End date copied exactly as written, e.g. 'May 2025'; null if current")
     current: bool = Field(description="True if this is the current job")
+    internship: bool = Field(description="True if this position is an internship (stage, stagiair, intern, trainee)")
     bullets: list[str] = Field(description="Each responsibility or achievement, copied from the CV")
 
 
@@ -67,21 +69,89 @@ class LlmCV(BaseModel):
 _LEVELS = {"secondary", "professional_bachelor", "bachelor", "master", "phd"}
 
 
+_MONTHS = {
+    "jan": 1,
+    "januari": 1,
+    "january": 1,
+    "janvier": 1,
+    "janv": 1,
+    "feb": 2,
+    "februari": 2,
+    "february": 2,
+    "fevrier": 2,
+    "février": 2,
+    "fev": 2,
+    "fév": 2,
+    "févr": 2,
+    "mrt": 3,
+    "maart": 3,
+    "mar": 3,
+    "march": 3,
+    "mars": 3,
+    "apr": 4,
+    "april": 4,
+    "avril": 4,
+    "avr": 4,
+    "mei": 5,
+    "may": 5,
+    "mai": 5,
+    "jun": 6,
+    "juni": 6,
+    "june": 6,
+    "juin": 6,
+    "jul": 7,
+    "juli": 7,
+    "july": 7,
+    "juillet": 7,
+    "juil": 7,
+    "aug": 8,
+    "augustus": 8,
+    "august": 8,
+    "aout": 8,
+    "août": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "septembre": 9,
+    "okt": 10,
+    "oct": 10,
+    "oktober": 10,
+    "october": 10,
+    "octobre": 10,
+    "nov": 11,
+    "november": 11,
+    "novembre": 11,
+    "dec": 12,
+    "december": 12,
+    "décembre": 12,
+    "decembre": 12,
+    "déc": 12,
+}
+_PRESENT = ("heden", "present", "current", "now", "today", "aujourd", "actuel", "en cours")
+
+
+def is_present(value: str | None) -> bool:
+    return bool(value) and any(word in str(value).lower() for word in _PRESENT)
+
+
 def _ym(value: str | None) -> str | None:
-    """Normalizes dates like 2021-03, 2021/3, 03/2021, 3-2021 or 2021 to YYYY-MM / YYYY."""
+    """Normalizes dates like 'Sep 2024', 'september 2024', '2021-03', '03/2021' or '2021' to YYYY-MM / YYYY."""
     import re
 
-    if not value:
+    if not value or is_present(value):
         return None
-    if match := re.search(r"\b(\d{4})[-/.](\d{1,2})\b", value):
-        year, month = match.group(1), match.group(2)
-    elif match := re.search(r"\b(\d{1,2})[-/.](\d{4})\b", value):
-        month, year = match.group(1), match.group(2)
-    elif match := re.search(r"\b(\d{4})\b", value):
+    text = value.lower()
+    if (match := re.search(r"([a-zéû]{3,10})\.?\s*'?(\d{4})", text)) and (month := _MONTHS.get(match.group(1))):
+        return f"{match.group(2)}-{month:02d}"
+    if match := re.search(r"\b(\d{4})[-/.](\d{1,2})\b", text):
+        year, month_text = match.group(1), match.group(2)
+    elif match := re.search(r"\b(\d{1,2})[-/.](\d{4})\b", text):
+        month_text, year = match.group(1), match.group(2)
+    elif match := re.search(r"\b(\d{4})\b", text):
         return match.group(1)
     else:
         return None
-    return f"{year}-{int(month):02d}" if 1 <= int(month) <= 12 else year
+    return f"{year}-{int(month_text):02d}" if 1 <= int(month_text) <= 12 else year
 
 
 def to_extracted(cv: LlmCV) -> ExtractedCV:
@@ -93,8 +163,9 @@ def to_extracted(cv: LlmCV) -> ExtractedCV:
                     "employer": e.employer[:200],
                     "location": e.location,
                     "start": _ym(e.start),
-                    "end": None if e.current else _ym(e.end),
-                    "is_current": e.current,
+                    "end": None if e.current or is_present(e.end) else _ym(e.end),
+                    "is_current": e.current or is_present(e.end),
+                    "is_internship": e.internship or looks_like_internship(e.job_title, e.employer),
                     "bullets": [b[:1000] for b in e.bullets if b.strip()][:30],
                 }
                 for e in cv.experiences
@@ -111,7 +182,7 @@ def to_extracted(cv: LlmCV) -> ExtractedCV:
                 for e in cv.education
                 if e.degree.strip() and e.institution.strip()
             ],
-            "skills": [s[:200] for s in cv.skills if s.strip()][:80],
+            "skills": split_skills([s for s in cv.skills if s.strip()])[:80],
             "languages": [LanguageSkill(code=lang.code, level=lang.level) for lang in cv.languages if 2 <= len(lang.code.strip()) <= 12][
                 :15
             ],

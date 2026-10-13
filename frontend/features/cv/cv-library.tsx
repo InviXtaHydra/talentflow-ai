@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FilePlus2, FileText, ScanSearch, Sparkles, Trash2, Upload } from "lucide-react";
+import { Download, FilePlus2, FileText, RefreshCw, ScanSearch, Sparkles, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -38,6 +38,11 @@ export function CvLibrary() {
   const fromProfile = useMutation({
     mutationFn: () => api.post<{ id: string }>("/cv-versions", { title: "Mijn cv", template: "modern", language: "nl" }),
     onSuccess: (data) => router.push(`/cv/versions/${data.id}`),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const reextract = useMutation({
+    mutationFn: (cvId: string) => api.post(`/cvs/${cvId}/retry-extraction`),
+    onSuccess: (_d, cvId) => { toast.success("Je cv wordt opnieuw herkend"); qc.invalidateQueries({ queryKey: ["cvs"] }); router.push(`/cv/${cvId}/review`); },
     onError: (e) => toast.error(errorMessage(e)),
   });
   const analyze = useMutation({
@@ -111,6 +116,9 @@ export function CvLibrary() {
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {d.extraction_status === "completed" && <Button asChild size="sm" variant={d.confirmed_at ? "ghost" : "primary"}><Link href={`/cv/${d.id}/review`}>{d.confirmed_at ? "Opnieuw nakijken" : "Nakijken en bevestigen"}</Link></Button>}
+                        {!d.is_demo && ["completed", "failed"].includes(d.extraction_status) && (
+                          <Button size="sm" variant="ghost" loading={reextract.isPending && reextract.variables === d.id} onClick={() => reextract.mutate(d.id)}><RefreshCw />Opnieuw herkennen</Button>
+                        )}
                         {d.confirmed_at && <Button size="sm" variant="ghost" loading={analyze.isPending && analyze.variables === d.id} onClick={() => analyze.mutate(d.id)}><ScanSearch />Analyseren</Button>}
                         <Button asChild size="sm" variant="ghost"><a href={`/api/v1/cvs/${d.id}/file`} target="_blank" rel="noreferrer"><Download />Origineel</a></Button>
                         <Button size="sm" variant="ghost" onClick={() => setToDelete({ kind: "doc", id: d.id, name: d.original_filename })}><Trash2 />Verwijderen</Button>

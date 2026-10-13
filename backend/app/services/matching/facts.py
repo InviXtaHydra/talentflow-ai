@@ -6,7 +6,7 @@ from app.schemas.cv import CVContent
 from app.schemas.profile import ProfileContent
 from app.services.matching.engine import CandidateFacts, ExperienceFact, JobFacts, PreferenceFacts
 from app.utils.salary import to_annual_eur
-from app.utils.skills import normalize_skill
+from app.utils.skills import looks_like_internship, normalize_skill, split_skills
 
 _EDU_RANK = {
     EducationLevel.NONE: 0,
@@ -47,6 +47,7 @@ def candidate_facts(profile: CandidateProfile | None, prefs: CandidatePreference
             start=e.start,
             end=e.end,
             is_current=e.is_current,
+            is_internship=e.is_internship or looks_like_internship(e.title, e.employer),
         )
         for e in content.experiences
     ]
@@ -55,7 +56,7 @@ def candidate_facts(profile: CandidateProfile | None, prefs: CandidatePreference
         titles.append(profile.headline)
     if prefs:
         titles.extend(prefs.desired_titles or [])
-    skills = {normalize_skill(s): s for s in content.skills}
+    skills = {normalize_skill(s): s for s in split_skills(content.skills)}
     for project in content.projects:
         for tech in project.technologies:
             skills.setdefault(normalize_skill(tech), tech)
@@ -76,6 +77,7 @@ def candidate_facts(profile: CandidateProfile | None, prefs: CandidatePreference
         preferences=preference_facts(prefs),
         city=profile.city if profile else None,
         embedding=list(profile.embedding) if use_embedding and profile is not None and profile.embedding is not None else None,
+        skills_text=" | ".join(content.skills),
     )
 
 
@@ -91,10 +93,13 @@ def cv_candidate_facts(cv: CVContent, base: CandidateFacts) -> CandidateFacts:
             start=e.start,
             end=e.end,
             is_current=e.is_current,
+            is_internship=next(
+                (b.is_internship for b in base.experiences if b.id == e.source_id), looks_like_internship(e.title, e.employer)
+            ),
         )
         for i, e in enumerate(cv.experiences)
     ]
-    skills = {normalize_skill(s): s for s in cv.skills}
+    skills = {normalize_skill(s): s for s in split_skills(cv.skills)}
     for project in cv.projects:
         for tech in project.technologies:
             skills.setdefault(normalize_skill(tech), tech)
@@ -116,6 +121,7 @@ def cv_candidate_facts(cv: CVContent, base: CandidateFacts) -> CandidateFacts:
         preferences=base.preferences,
         city=base.city,
         embedding=None,
+        skills_text=" | ".join(cv.skills),
     )
 
 

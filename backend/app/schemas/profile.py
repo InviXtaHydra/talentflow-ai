@@ -21,6 +21,8 @@ class Experience(BaseModel):
     start: YearMonth | None = None
     end: YearMonth | None = None
     is_current: bool = False
+    # Internships are shown on the CV but don't count as professional work experience in matching.
+    is_internship: bool = False
     description: LongText | None = None
     bullets: list[MediumText] = Field(default_factory=list, max_length=30)
 

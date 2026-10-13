@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, CircleHelp, Info, MinusCircle, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/feedback";
-import { formatMoney, languageName } from "@/lib/format";
+import { formatMoney, formatMonths, languageName } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { MatchComponent, MatchResult, PreferenceCheck } from "@/types/api";
@@ -17,6 +17,7 @@ function issueText(issue: Record<string, unknown>): string {
   if (code.startsWith("language")) params.value = languageName(String(issue.value));
   if (code === "language_level") params.level = t(`enums.languageLevel.${issue.level}`);
   if (code === "education") params.value = t(`enums.education.${issue.value}`);
+  if (code === "experience") params.relevant = formatMonths(Number(issue.relevant_months ?? 0));
   return t(`match.issue.${code}`, params);
 }
 
@@ -27,6 +28,7 @@ function componentDetail(c: MatchComponent): string | null {
       no_job_skills: "De vacature vermeldt geen vaardigheden.",
       no_candidate_skills: "Je profiel bevat nog geen vaardigheden of werkervaring.",
       no_candidate_experience: "Je profiel bevat nog geen werkervaring.",
+      only_internships: "Je profiel bevat alleen stages; die tellen niet als werkervaring.",
       no_candidate_titles: "Je profiel bevat nog geen functietitels.",
       no_job_requirement: "De vacature stelt geen opleidingseis.",
       no_candidate_education: "Je profiel vermeldt geen opleidingsniveau.",
@@ -37,10 +39,14 @@ function componentDetail(c: MatchComponent): string | null {
   switch (c.key) {
     case "skills":
       return `${d.matched} van ${d.total} gevraagde vaardigheden gevonden (${d.required_matched}/${d.required_total} verplicht).`;
-    case "experience":
-      return d.required_years != null
-        ? `${d.relevant_years} jaar relevante ervaring gevonden; gevraagd: ${d.required_years} jaar.`
-        : `${d.relevant_count} relevante functie(s) gevonden.`;
+    case "experience": {
+      const parts = [d.required_years != null
+        ? `${formatMonths(Number(d.relevant_months))} relevante werkervaring gevonden; gevraagd: ${d.required_years} jaar.`
+        : `${d.relevant_count} relevante functie(s) gevonden.`];
+      if (Number(d.internship_months) > 0) parts.push(`Stages (${formatMonths(Number(d.internship_months))}) tellen niet mee als werkervaring.`);
+      if (d.estimated_dates) parts.push("Sommige data hebben geen maand; vul ze aan in je profiel voor een exacte telling.");
+      return parts.join(" ");
+    }
     case "role":
       return `Vergeleken via ${t(`match.method.${d.method}`)}.`;
     case "qualifications":

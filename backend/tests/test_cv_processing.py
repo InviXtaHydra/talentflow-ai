@@ -36,6 +36,7 @@ def _fake_extraction(fake_ai) -> None:
                     start="03/2021",
                     end=None,
                     current=True,
+                    internship=False,
                     bullets=["Bouwde Power BI-dashboards"],
                 )
             ],

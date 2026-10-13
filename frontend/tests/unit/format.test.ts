@@ -21,3 +21,13 @@ describe("formatting", () => {
     expect(t("does.not.exist")).toBe("does.not.exist");
   });
 });
+
+describe("months", () => {
+  it("formats experience in years and months", async () => {
+    const { formatMonths } = await import("@/lib/format");
+    expect(formatMonths(14)).toBe("1 jaar en 2 maanden");
+    expect(formatMonths(6)).toBe("6 maanden");
+    expect(formatMonths(1)).toBe("1 maand");
+    expect(formatMonths(24)).toBe("2 jaar");
+  });
+});

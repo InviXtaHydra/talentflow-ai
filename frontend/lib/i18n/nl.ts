@@ -115,7 +115,7 @@ export const nl = {
       language: "Vereiste taal: {value}",
       language_level: "Vereist niveau voor {value} (jij: {level})",
       education: "Vereiste opleiding: {value}",
-      experience: "Vereist: {required_years} jaar ervaring (relevant gevonden: {relevant_years})",
+      experience: "Vereist: {required_years} jaar werkervaring (relevant gevonden: {relevant})",
       required_skills: "{missing} van de {total} verplichte vaardigheden ontbreken",
     },
     preference: {

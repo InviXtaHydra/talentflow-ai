@@ -30,7 +30,7 @@ from app.services.job_service import get_job
 from app.services.matching.engine import compute_match
 from app.services.matching.facts import candidate_facts, cv_candidate_facts, job_facts
 from app.services.notifications import notify
-from app.utils.skills import normalize_skill, text_mentions_skill
+from app.utils.skills import normalize_skill, split_skills, text_mentions_skill
 
 logger = logging.getLogger("talentflow.optimizer")
 
@@ -115,7 +115,9 @@ def _gap(source: CVContent, job: Job) -> GapAnalysis:
     source_text = " ".join(
         [source.summary or "", *(b.text for e in source.experiences for b in e.bullets), *(e.title for e in source.experiences)]
     )
-    profile_skills = {normalize_skill(s) for s in source.skills} | {normalize_skill(t) for p in source.projects for t in p.technologies}
+    profile_skills = {normalize_skill(s) for s in split_skills(source.skills)} | {
+        normalize_skill(t) for p in source.projects for t in p.technologies
+    }
     matching, missing_required, missing_preferred, missing_keywords = [], [], [], []
     for skill in job.skills:
         listed = skill.normalized_name in profile_skills

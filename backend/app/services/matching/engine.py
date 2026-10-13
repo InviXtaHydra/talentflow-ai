@@ -23,7 +23,7 @@ from app.utils import geo
 from app.utils.skills import text_mentions_skill
 from app.utils.text import tokens
 
-ALGORITHM_VERSION = "1.3.0"
+ALGORITHM_VERSION = "1.4.0"
 
 # Score cap when a hard requirement is clearly not met.
 HARD_REQUIREMENT_CAP = 60
@@ -54,6 +54,7 @@ class ExperienceFact:
     start: str | None
     end: str | None
     is_current: bool
+    is_internship: bool = False
 
 
 @dataclass
@@ -77,6 +78,7 @@ class CandidateFacts:
     preferences: PreferenceFacts
     city: str | None = None
     embedding: list[float] | None = None
+    skills_text: str = ""  # the skills list as written, for skills inside grouped entries
 
 
 @dataclass
@@ -115,25 +117,40 @@ def _component(key: str, weight: float, score: float | None, details: dict[str, 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
 
-def _parse_ym(value: str | None, *, end: bool) -> tuple[int, int] | None:
+def _parse_ym(value: str | None) -> tuple[int, int | None] | None:
+    """(year, month) with month None when only the year is known."""
     if not value:
         return None
     parts = value.split("-")
-    year = int(parts[0])
-    month = int(parts[1]) if len(parts) > 1 else (12 if end else 1)
-    return year, month
+    return int(parts[0]), int(parts[1]) if len(parts) > 1 else None
 
 
 def experience_months(exp: ExperienceFact, today: date) -> tuple[int, int] | None:
-    """Returns (start_index, end_index) in months, or None when the start date is unknown."""
-    start = _parse_ym(exp.start, end=False)
+    """Returns (start_index, end_index) in months, end exclusive; None when the start date is unknown.
+
+    Dates are counted to the month. A date with only a year is estimated conservatively (start in July,
+    end in June, half a year when both are in the same year) instead of counting the whole calendar year.
+    A finished position without an end date counts as one month."""
+    start = _parse_ym(exp.start)
     if start is None:
         return None
-    end = (today.year, today.month) if exp.is_current or not exp.end else _parse_ym(exp.end, end=True)
-    assert end is not None
-    s = start[0] * 12 + start[1] - 1
-    e = end[0] * 12 + end[1]  # inclusive end month
-    return (s, e) if e > s else None
+    s_year, s_month = start
+    e_month: int | None
+    if exp.is_current:
+        e_year, e_month = today.year, today.month
+    elif exp.end and (end := _parse_ym(exp.end)):
+        e_year, e_month = end
+    else:
+        e_year, e_month = s_year, s_month
+    if s_month is None and e_month is None and s_year == e_year:
+        s_month, e_month = 4, 9
+    s_index = s_year * 12 + (s_month if s_month is not None else 7) - 1
+    e_index = e_year * 12 + (e_month if e_month is not None else 6)  # inclusive end month
+    return (s_index, max(e_index, s_index + 1))
+
+
+def has_estimated_dates(exp: ExperienceFact) -> bool:
+    return any(v and "-" not in v for v in (exp.start, None if exp.is_current else exp.end))
 
 
 def _merged_months(intervals: list[tuple[int, int]]) -> int:
@@ -188,7 +205,7 @@ def title_similarity(candidate_titles: list[str], job_title: str) -> float:
 
 def _candidate_has_skill(candidate: CandidateFacts, skill: str) -> str | None:
     """'listed' when on the skills list, 'experience' when only evidenced in work experience, else None."""
-    if skill in candidate.skills:
+    if skill in candidate.skills or (candidate.skills_text and text_mentions_skill(candidate.skills_text, skill)):
         return "listed"
     for exp in candidate.experiences:
         if text_mentions_skill(f"{exp.title} {exp.text}", skill):
@@ -229,48 +246,68 @@ def score_skills(candidate: CandidateFacts, job: JobFacts, weight: float) -> tup
 
 
 def score_experience(candidate: CandidateFacts, job: JobFacts, weight: float, today: date) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Relevant professional experience, counted in months. Internships are listed but don't count."""
     required_years = (
         job.min_years if job.min_years is not None else (_LEVEL_YEARS.get(job.experience_level) if job.experience_level else None)
     )
+    required_months = required_years * 12 if required_years is not None else None
     job_skill_keys = list(job.required_skills) + list(job.preferred_skills)
     relevant: list[dict[str, Any]] = []
     intervals: list[tuple[int, int]] = []
     all_intervals: list[tuple[int, int]] = []
+    internship_intervals: list[tuple[int, int]] = []
+    estimated = False
     for exp in candidate.experiences:
         span = experience_months(exp, today)
-        if span:
+        if span and exp.is_internship:
+            internship_intervals.append(span)
+        elif span:
             all_intervals.append(span)
         text = f"{exp.title} {exp.text}"
         skill_hits = [k for k in job_skill_keys if text_mentions_skill(text, k)]
         title_sim = _dice(tokens(exp.title), tokens(job.title))
         if title_sim >= 0.3 or skill_hits:
             months = (span[1] - span[0]) if span else None
-            relevant.append({"id": exp.id, "title": exp.title, "employer": exp.employer, "months": months, "skills": len(skill_hits)})
-            if span:
+            relevant.append(
+                {
+                    "id": exp.id,
+                    "title": exp.title,
+                    "employer": exp.employer,
+                    "months": months,
+                    "skills": len(skill_hits),
+                    "internship": exp.is_internship,
+                }
+            )
+            if span and not exp.is_internship:
                 intervals.append(span)
+                estimated = estimated or has_estimated_dates(exp)
 
-    relevant_years = round(_merged_months(intervals) / 12, 1)
-    total_years = round(_merged_months(all_intervals) / 12, 1)
+    relevant_months = _merged_months(intervals)
+    professional = [e for e in candidate.experiences if not e.is_internship]
     if not candidate.experiences:
         score = 1.0 if required_years == 0 else None
         reason = None if score is not None else "no_candidate_experience"
-    elif required_years is None:
-        score = 1.0 if relevant else 0.5
+    elif required_months is None:
+        score = 1.0 if any(not r["internship"] for r in relevant) else 0.5
         reason = None
-    elif required_years == 0:
+    elif required_months == 0:
         score = 1.0
         reason = None
     else:
-        score = min(1.0, relevant_years / required_years)
-        reason = None
+        score = min(1.0, relevant_months / required_months)
+        reason = None if professional else "only_internships"
     details = {
         "required_years": required_years,
-        "relevant_years": relevant_years,
-        "total_years": total_years,
+        "required_months": required_months,
+        "relevant_months": relevant_months,
+        "relevant_years": round(relevant_months / 12, 1),
+        "total_months": _merged_months(all_intervals),
+        "internship_months": _merged_months(internship_intervals),
+        "estimated_dates": estimated,
         "relevant_count": len(relevant),
         "reason": reason,
     }
-    relevant.sort(key=lambda r: (r["skills"], r["months"] or 0), reverse=True)
+    relevant.sort(key=lambda r: (not r["internship"], r["skills"], r["months"] or 0), reverse=True)
     return _component("experience", weight, score, details), relevant
 
 
@@ -396,8 +433,8 @@ def _eligibility(
         issues.append({"code": "required_skills", "missing": missing_required_count, "total": required_total})
     details = experience["details"]
     required = details.get("required_years")
-    if required and experience["applicable"] and details["relevant_years"] < required * 0.5:
-        issues.append({"code": "experience", "required_years": required, "relevant_years": details["relevant_years"]})
+    if required and experience["applicable"] and details["relevant_months"] < required * 12 * 0.5:
+        issues.append({"code": "experience", "required_years": required, "relevant_months": details["relevant_months"]})
     elif required and not experience["applicable"]:
         unknown.append({"code": "experience", "required_years": required})
     status = "not_met" if issues else ("unknown" if unknown else "met")

@@ -131,3 +131,62 @@ def test_skill_evidenced_only_in_experience_counts():
     result = compute_match(candidate(skills={}), job(), W, TODAY)
     evidence = {s["name"]: s["evidence"] for s in result["matching_skills"]}
     assert evidence["Python"] == "experience"
+
+
+def test_grouped_skill_entries_are_matched():
+    from app.utils.skills import split_skills
+
+    grouped = ["Angular, Vue.js, React, .NET MAUI, SPFX", "SCRUM, Atlassian Jira & Confluence", "SAP BTP Training - Basics to Advanced"]
+    assert {"React", "Vue.js", "Atlassian Jira", "Confluence"} <= set(split_skills(grouped))
+    skills = {normalize_skill(s): s for s in split_skills(grouped)}
+    result = compute_match(
+        candidate(skills=skills, skills_text=" | ".join(grouped)),
+        job(required_skills={"react": "React", "sap btp": "SAP BTP"}, preferred_skills={}),
+        W,
+        TODAY,
+    )
+    assert {s["name"] for s in result["matching_skills"]} == {"React", "SAP BTP"}
+
+
+def test_internships_do_not_count_as_work_experience():
+    exps = [
+        ExperienceFact("i", "Backend Developer", "Acme (Internship)", "Python", "2024-09", "2025-05", False, is_internship=True),
+        ExperienceFact("j", "Backend Developer", "Globex", "Python", "2025-09", "2025-10", False),
+    ]
+    result = compute_match(candidate(experiences=exps), job(min_years=1), W, TODAY)
+    details = next(c for c in result["components"] if c["key"] == "experience")["details"]
+    assert details["relevant_months"] == 2  # only Sep + Oct 2025
+    assert details["internship_months"] == 9
+    assert any(i["code"] == "experience" for i in result["eligibility"]["issues"])
+    assert any(r["internship"] for r in result["relevant_experience"])
+
+
+def test_experience_is_counted_in_months_and_year_only_dates_are_not_inflated():
+    exact = compute_match(
+        candidate(experiences=[ExperienceFact("a", "Backend Developer", "A", "Python", "2025-03", "2025-08", False)]),
+        job(min_years=1),
+        W,
+        TODAY,
+    )
+    details = next(c for c in exact["components"] if c["key"] == "experience")["details"]
+    assert details["relevant_months"] == 6
+    assert next(c for c in exact["components"] if c["key"] == "experience")["score"] == 50
+
+    vague = compute_match(
+        candidate(experiences=[ExperienceFact("b", "Backend Developer", "B", "Python", "2024", "2025", False)]), job(min_years=2), W, TODAY
+    )
+    vague_details = next(c for c in vague["components"] if c["key"] == "experience")["details"]
+    assert vague_details["relevant_months"] == 12  # not 24
+    assert vague_details["estimated_dates"] is True
+
+
+def test_cv_dates_with_month_names_are_parsed():
+    from app.services.cv.llm_schema import _ym, is_present
+
+    assert _ym("Sep 2024") == "2024-09"
+    assert _ym("september 2024") == "2024-09"
+    assert _ym("mrt. 2021") == "2021-03"
+    assert _ym("févr. 2020") == "2020-02"
+    assert _ym("03/2021") == "2021-03"
+    assert _ym("2019") == "2019"
+    assert is_present("heden") and is_present("Present") and not is_present("May 2025")

@@ -61,6 +61,7 @@ export interface Experience {
   start?: string | null;
   end?: string | null;
   is_current: boolean;
+  is_internship?: boolean;
   description?: string | null;
   bullets: string[];
 }
