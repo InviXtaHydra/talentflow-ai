@@ -4,6 +4,7 @@ Deze handleiding legt stap voor stap uit wat TalentFlow AI is, hoe je het instal
 gebruikt als kandidaat, werkgever en beheerder. Achteraan staan de technische uitleg, de tests en een lijst met
 veelvoorkomende problemen en oplossingen.
 
+> Wil je weten hoe de code werkt? Lees [CODE-UITLEG.md](CODE-UITLEG.md).
 > Snel iets opzoeken? De korte technische samenvatting staat in [README.md](README.md). Diepere technische documentatie
 > staat in de map [docs/](docs/).
 
