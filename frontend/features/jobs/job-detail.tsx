@@ -247,7 +247,9 @@ export function JobDetailPage() {
   const salary = formatSalary(j.salary_min, j.salary_max, j.salary_currency, j.salary_period);
   const required = j.skills.filter((s) => s.is_required);
   const niceToHave = j.skills.filter((s) => !s.is_required);
-  const matched = new Set((j.match?.matching_skills ?? []).map((s) => s.toLowerCase()));
+  // The full match result; the summary on j.match is cut to three skills for the vacancy cards.
+  const matchedNames = match.data?.result.matching_skills.map((s) => s.name) ?? j.match?.matching_skills ?? [];
+  const matched = new Set(matchedNames.map((s) => s.toLowerCase()));
 
   return (
     <div className="flex flex-col gap-6">
@@ -291,7 +293,7 @@ export function JobDetailPage() {
                 {j.skills.length > 0 && (
                   <Highlight icon={CircleCheck}>
                     Vaardigheden: {j.skills.slice(0, 4).map((s) => s.name).join(", ")}{j.skills.length > 4 && ` en ${j.skills.length - 4} meer`}
-                    {isCandidate && j.match && j.match.score != null && <span className="ml-1 font-medium text-success">({j.match.matching_skills.length} van {j.skills.length} in je profiel)</span>}
+                    {isCandidate && match.data && match.data.score != null && <span className="ml-1 font-medium text-success">({matched.size} van {j.skills.length} in je profiel)</span>}
                   </Highlight>
                 )}
                 {j.openings > 1 && <Highlight icon={Users}>{j.openings} openstaande plaatsen</Highlight>}
