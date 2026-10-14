@@ -45,7 +45,10 @@ export function AssistantPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["assistant"] }),
   });
   const clear = useMutation({ mutationFn: () => api.delete("/assistant/messages"), onSuccess: () => qc.invalidateQueries({ queryKey: ["assistant"] }), onError: (e) => toast.error(errorMessage(e)) });
-  React.useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [history.data, pending]);
+  // Block body on purpose: newer browsers return a Promise from scrollIntoView, which React would treat as a cleanup function.
+  React.useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history.data, pending]);
 
   const send = (message: string) => { if (message.trim() && !ask.isPending) { ask.mutate(message.trim()); setText(""); } };
   const messages = history.data ?? [];

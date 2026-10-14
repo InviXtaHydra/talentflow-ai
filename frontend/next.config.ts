@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  experimental: {
+    // The career assistant answers synchronously and a local model can take longer than the 30 s default of the
+    // /api rewrite proxy. Keep this above AI_TIMEOUT_SECONDS (300 s by default).
+    proxyTimeout: 330_000,
+  },
   turbopack: {
     rules: {
       "*.css": {
