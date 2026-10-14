@@ -34,7 +34,7 @@ from app.models.enums import (
 )
 from app.schemas.jobs import JobSkillIn
 from app.schemas.profile import ContactDetails, ExtractedCV, ProfileContent
-from app.seed.demo_data import DEMO_CANDIDATE, DEMO_COMPANIES, DEMO_JOBS
+from app.seed.demo_data import DEMO_CANDIDATE, DEMO_COMPANIES, DEMO_JOBS, demo_job_details
 from app.services import tasks
 from app.services.auth_service import create_user, unique_company_slug
 from app.services.cv.content import profile_to_cv_content
@@ -70,7 +70,12 @@ def seed_jobs(db: Session) -> int:
     now = utcnow()
     for index, data in enumerate(DEMO_JOBS):
         external_id = f"demo-{index:03d}"
-        if db.scalar(select(Job.id).where(Job.source == JobSource.DEMO, Job.external_id == external_id)):
+        existing = db.scalar(select(Job).where(Job.source == JobSource.DEMO, Job.external_id == external_id))
+        if existing is not None:
+            # Demo vacancies seeded before the detail fields existed get them filled in once.
+            if not existing.benefits and not existing.hiring_process:
+                for key, value in demo_job_details(index, data).items():
+                    setattr(existing, key, value)
             continue
         salary = data["salary"]
         job = Job(
@@ -98,6 +103,7 @@ def seed_jobs(db: Session) -> int:
             external_id=external_id,
             is_demo=True,
             application_url=None,
+            **demo_job_details(index, data),
         )
         _set_skills(job, [JobSkillIn(name=n, is_required=r) for n, r in data["skills"]])
         db.add(job)

@@ -1,7 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Building2, ExternalLink, GraduationCap, Languages, MessageSquareText, Pencil, Send, Sparkles } from "lucide-react";
+import {
+  ArrowLeft, ArrowUpRight, Briefcase, Building2, CalendarDays, CircleCheck, Clock, ExternalLink, Eye, Globe, GraduationCap, Hourglass,
+  Languages, Layers, MapPin, MessageSquareText, Pencil, Send, Sparkles, Timer, Users, Wallet,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
@@ -16,12 +19,12 @@ import { Alert, Badge, Skeleton } from "@/components/ui/feedback";
 import { Checkbox, Field, Select, Textarea } from "@/components/ui/input";
 import { useMe, usePublicConfig } from "@/hooks/use-auth";
 import { api, ApiError, errorMessage } from "@/lib/api";
-import { formatDate, languageName } from "@/lib/format";
+import { formatDate, formatMonths, formatSalary, languageName, relativeTime } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import type { CvLanguage, CvTemplate, CvVersionSummary, JobDetail, JobSummary, MatchOut } from "@/types/api";
 
 import { CompanyLogo } from "./company-logo";
-import { DemoBadge, JobCard, JobMeta, SaveJobButton } from "./job-card";
+import { DemoBadge, JobCard, SaveJobButton } from "./job-card";
 import { MatchBreakdown } from "./match-breakdown";
 
 function OptimizeDialog({ job, open, onOpenChange }: { job: JobDetail; open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -133,6 +136,93 @@ function ExternalApply({ job }: { job: JobDetail }) {
   );
 }
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="text-base font-semibold text-text">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function Highlight({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-3 text-sm text-text-2">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted" />
+      <span>{children}</span>
+    </li>
+  );
+}
+
+function plural(n: number, one: string, many: string) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** Practical terms as label/value pairs; rows without a value are left out instead of showing "unknown". */
+function detailRows(j: JobDetail): [string, React.ReactNode][] {
+  const rows: [string, React.ReactNode | null][] = [
+    ["Senioriteitsniveau", j.experience_level && t(`enums.experienceLevel.${j.experience_level}`)],
+    ["Dienstverband", t(`enums.employmentType.${j.employment_type}`)],
+    ["Werkplek", `${t(`enums.remote.${j.remote_policy}`)}${j.city ? ` · ${j.city}` : ""}`],
+    ["Afdeling", j.department],
+    ["Sector", j.industry],
+    ["Uren per week", j.hours_per_week && `${j.hours_per_week} uur`],
+    ["Contractduur", j.contract_duration_months ? formatMonths(j.contract_duration_months) : j.employment_type === "full_time" || j.employment_type === "part_time" ? "Onbepaalde duur" : null],
+    ["Startdatum", j.start_date ? formatDate(j.start_date) : "In overleg"],
+    ["Aantal vacatures", j.openings > 1 ? j.openings : null],
+    ["Ervaring", j.min_years_experience != null && (j.min_years_experience === 0 ? "Geen ervaring vereist" : `Minstens ${plural(j.min_years_experience, "jaar", "jaar")}`)],
+    ["Opleiding", j.education_level ? t(`enums.education.${j.education_level}`) : "Geen opleidingseis"],
+    ["Talen", j.required_languages.length ? j.required_languages.map(languageName).join(", ") : null],
+    ["Taal van de vacature", languageName(j.language)],
+    ["Solliciteren tot", j.application_deadline && formatDate(j.application_deadline)],
+    ["Gepubliceerd", j.published_at && formatDate(j.published_at)],
+  ];
+  return rows.filter((r): r is [string, React.ReactNode] => r[1] != null && r[1] !== "" && r[1] !== false && r[1] !== 0);
+}
+
+function HiringTeam({ job }: { job: JobDetail }) {
+  if (!job.recruiter) return null;
+  const initials = job.recruiter.full_name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+  return (
+    <Card>
+      <CardHeader title="Het wervingsteam" />
+      <CardBody className="flex items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent-soft text-sm font-semibold text-accent">{initials}</span>
+        <div className="min-w-0">
+          <p className="font-medium text-text">{job.recruiter.full_name}</p>
+          <p className="text-sm text-muted">Plaatste deze vacature voor {job.company.name}</p>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+function AboutCompany({ job }: { job: JobDetail }) {
+  const c = job.company;
+  const p = job.company_profile;
+  const facts = [c.industry, p.size && `${p.size} medewerkers`, c.city].filter(Boolean).join(" · ");
+  return (
+    <Card>
+      <CardHeader title="Over het bedrijf" />
+      <CardBody className="flex flex-col gap-4">
+        <div className="flex items-center gap-4">
+          <CompanyLogo company={c} size={48} />
+          <div className="min-w-0">
+            <Link href={`/companies/${c.id}`} className="font-semibold text-text hover:text-accent">{c.name}</Link>
+            {facts && <p className="text-sm text-muted">{facts}</p>}
+            <p className="text-sm text-muted">{plural(p.open_jobs, "openstaande vacature", "openstaande vacatures")}</p>
+          </div>
+        </div>
+        {p.description && <p className="whitespace-pre-line text-[15px] leading-relaxed text-text-2">{p.description}</p>}
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="secondary" size="sm"><Link href={`/companies/${c.id}`}><Building2 />Bedrijfspagina en vacatures</Link></Button>
+          {p.website_url && <Button asChild variant="ghost" size="sm"><a href={p.website_url} target="_blank" rel="noopener noreferrer"><Globe />Website<ArrowUpRight /></a></Button>}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const params = useSearchParams();
@@ -154,6 +244,10 @@ export function JobDetailPage() {
   if (!job.data) return <PageSkeleton />;
   const j = job.data;
   const open = j.status === "published";
+  const salary = formatSalary(j.salary_min, j.salary_max, j.salary_currency, j.salary_period);
+  const required = j.skills.filter((s) => s.is_required);
+  const niceToHave = j.skills.filter((s) => !s.is_required);
+  const matched = new Set((j.match?.matching_skills ?? []).map((s) => s.toLowerCase()));
 
   return (
     <div className="flex flex-col gap-6">
@@ -162,29 +256,57 @@ export function JobDetailPage() {
       {j.status === "draft" && <Alert tone="neutral">Concept: alleen zichtbaar voor jouw bedrijf.</Alert>}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
             <CardBody className="flex flex-col gap-5 p-6">
-              <div className="flex gap-4">
-                <CompanyLogo company={j.company} size={56} />
-                <div className="min-w-0">
-                  <h1 className="text-2xl font-semibold tracking-tight text-text">{j.title}</h1>
-                  <p className="mt-1 flex flex-wrap items-center gap-2 text-text-2">
-                    <Link href={`/companies/${j.company.id}`} className="hover:text-accent">{j.company.name}</Link>
-                    {j.is_demo && <DemoBadge />}
-                  </p>
-                </div>
+              <div className="flex items-center gap-3">
+                <CompanyLogo company={j.company} size={40} />
+                <Link href={`/companies/${j.company.id}`} className="text-sm font-medium text-text-2 hover:text-accent">{j.company.name}</Link>
+                {j.is_demo && <DemoBadge />}
               </div>
-              <JobMeta job={j} />
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight text-text sm:text-[28px]">{j.title}</h1>
+                <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
+                  <span>{j.city ?? t("common.notSpecified")}</span>
+                  {j.published_at && <><span aria-hidden>·</span><span>Geplaatst {relativeTime(j.published_at)}</span></>}
+                  <span aria-hidden>·</span>
+                  <span className={j.applicant_count > 0 ? "font-medium text-success" : undefined}>
+                    {j.applicant_count > 0 ? plural(j.applicant_count, "sollicitant", "sollicitanten") : "Wees een van de eerste sollicitanten"}
+                  </span>
+                  {j.view_count > 0 && <><span aria-hidden>·</span><span className="inline-flex items-center gap-1"><Eye className="size-3.5" />{plural(j.view_count, "keer", "keer")} bekeken</span></>}
+                </p>
+              </div>
+
               <div className="flex flex-wrap gap-2">
-                {isCandidate && open && <Button onClick={() => setOptimizeOpen(true)}><Sparkles />Optimaliseer mijn cv voor deze vacature</Button>}
-                {isCandidate && open && !j.application && <Button variant="secondary" onClick={() => setApplyOpen(true)}><Send />Solliciteren via {j.company.name}</Button>}
+                <Badge tone="accent" className="px-2.5 py-1 text-[13px]"><MapPin className="size-3.5" />{t(`enums.remote.${j.remote_policy}`)}</Badge>
+                <Badge tone="accent" className="px-2.5 py-1 text-[13px]"><Briefcase className="size-3.5" />{t(`enums.employmentType.${j.employment_type}`)}</Badge>
+                {j.experience_level && <Badge tone="neutral" className="px-2.5 py-1 text-[13px]"><Layers className="size-3.5" />{t(`enums.experienceLevel.${j.experience_level}`)}</Badge>}
+                {salary && <Badge tone="success" className="px-2.5 py-1 text-[13px]"><Wallet className="size-3.5" />{salary}</Badge>}
+              </div>
+
+              <ul className="flex flex-col gap-2.5">
+                {j.hours_per_week && <Highlight icon={Clock}>{j.hours_per_week} uur per week{j.contract_duration_months ? ` · contract van ${formatMonths(j.contract_duration_months)}` : ""}</Highlight>}
+                <Highlight icon={Building2}>{[j.company_profile.size && `${j.company_profile.size} medewerkers`, j.company.industry ?? j.industry].filter(Boolean).join(" · ") || j.company.name}</Highlight>
+                {j.required_languages.length > 0 && <Highlight icon={Languages}>Talen: {j.required_languages.map(languageName).join(", ")}</Highlight>}
+                {j.skills.length > 0 && (
+                  <Highlight icon={CircleCheck}>
+                    Vaardigheden: {j.skills.slice(0, 4).map((s) => s.name).join(", ")}{j.skills.length > 4 && ` en ${j.skills.length - 4} meer`}
+                    {isCandidate && j.match && j.match.score != null && <span className="ml-1 font-medium text-success">({j.match.matching_skills.length} van {j.skills.length} in je profiel)</span>}
+                  </Highlight>
+                )}
+                {j.openings > 1 && <Highlight icon={Users}>{j.openings} openstaande plaatsen</Highlight>}
+                {j.application_deadline && <Highlight icon={Hourglass}>Solliciteren tot {formatDate(j.application_deadline)}</Highlight>}
+              </ul>
+
+              <div className="flex flex-wrap gap-2">
+                {isCandidate && open && !j.application && <Button onClick={() => setApplyOpen(true)}><Send />Solliciteren</Button>}
                 {isCandidate && open && j.application_url && <ExternalApply job={j} />}
-                {isCandidate && !j.application && <Button variant="ghost" loading={track.isPending} onClick={() => track.mutate()}>Volgen in sollicitaties</Button>}
                 {isCandidate && <SaveJobButton job={j} />}
+                {isCandidate && open && <Button variant="secondary" onClick={() => setOptimizeOpen(true)}><Sparkles />Optimaliseer mijn cv voor deze vacature</Button>}
+                {isCandidate && !j.application && <Button variant="ghost" loading={track.isPending} onClick={() => track.mutate()}>Volgen in sollicitaties</Button>}
                 {isCandidate && <Button asChild variant="ghost"><Link href={`/assistant?job=${j.id}`}><MessageSquareText />Vraag de assistent</Link></Button>}
                 {j.can_edit && <Button asChild variant="secondary"><Link href={`/employer/jobs/${j.id}/edit`}><Pencil />Bewerken</Link></Button>}
-                {!me.data && <Button asChild><Link href={`/register?next=/jobs/${j.id}`}>Maak een account om je match te zien</Link></Button>}
+                {!me.data && <Button asChild><Link href={`/register?next=/jobs/${j.id}`}>Maak een account om te solliciteren</Link></Button>}
               </div>
               {j.application && (
                 <Alert tone="accent">Je volgt deze vacature: <strong>{t(`enums.applicationStatus.${j.application.status}`)}</strong>. <Link href="/applications" className="underline">Naar je sollicitaties</Link></Alert>
@@ -193,32 +315,80 @@ export function JobDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Over de functie" />
-            <CardBody className="flex flex-col gap-6 text-[15px] leading-relaxed text-text-2">
+            <CardHeader title="Over de vacature" />
+            <CardBody className="flex flex-col gap-7 py-5 text-[15px] leading-relaxed text-text-2">
               <p className="whitespace-pre-line">{j.description}</p>
               {j.responsibilities.length > 0 && (
-                <div><h3 className="mb-2 font-semibold text-text">Wat je doet</h3><ul className="list-disc space-y-1 pl-5">{j.responsibilities.map((r) => <li key={r}>{r}</li>)}</ul></div>
+                <Section title="Wat ga je doen?">
+                  <ul className="list-disc space-y-1.5 pl-5 marker:text-muted">{j.responsibilities.map((r) => <li key={r}>{r}</li>)}</ul>
+                </Section>
               )}
               {j.qualifications.length > 0 && (
-                <div><h3 className="mb-2 font-semibold text-text">Wat we vragen</h3><ul className="list-disc space-y-1 pl-5">{j.qualifications.map((r) => <li key={r}>{r}</li>)}</ul></div>
+                <Section title="Wie zoeken we?">
+                  <ul className="list-disc space-y-1.5 pl-5 marker:text-muted">{j.qualifications.map((r) => <li key={r}>{r}</li>)}</ul>
+                </Section>
               )}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <h3 className="mb-2 font-semibold text-text">Vaardigheden</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {j.skills.map((s) => <Badge key={s.name} tone={s.is_required ? "accent" : "neutral"} title={s.is_required ? t("common.required") : "Pluspunt"}>{s.name}</Badge>)}
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted">Gekleurd = verplicht, grijs = pluspunt</p>
-                </div>
-                <dl className="flex flex-col gap-2 text-sm">
-                  <div className="flex gap-2"><GraduationCap className="size-4 text-muted" /><dt className="sr-only">Opleiding</dt><dd>{j.education_level ? t(`enums.education.${j.education_level}`) : "Geen opleidingseis vermeld"}</dd></div>
-                  <div className="flex gap-2"><Languages className="size-4 text-muted" /><dt className="sr-only">Talen</dt><dd>{j.required_languages.length ? j.required_languages.map(languageName).join(", ") : "Geen taalvereisten vermeld"}</dd></div>
-                  <div className="flex gap-2"><Building2 className="size-4 text-muted" /><dt className="sr-only">Ervaring</dt><dd>{j.min_years_experience != null ? `${j.min_years_experience} jaar ervaring` : "Ervaring niet vermeld"}</dd></div>
-                  {j.application_deadline && <div className="text-muted">Solliciteren tot {formatDate(j.application_deadline)}</div>}
-                </dl>
-              </div>
+              {j.skills.length > 0 && (
+                <Section title="Vaardigheden">
+                  {required.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-sm font-medium text-text">Vereist</p>
+                      <div className="flex flex-wrap gap-1.5">{required.map((s) => <Badge key={s.name} tone={matched.has(s.name.toLowerCase()) ? "success" : "accent"}>{matched.has(s.name.toLowerCase()) && <CircleCheck className="size-3" />}{s.name}</Badge>)}</div>
+                    </div>
+                  )}
+                  {niceToHave.length > 0 && (
+                    <div>
+                      <p className="mb-1.5 text-sm font-medium text-text">Pluspunten</p>
+                      <div className="flex flex-wrap gap-1.5">{niceToHave.map((s) => <Badge key={s.name} tone={matched.has(s.name.toLowerCase()) ? "success" : "neutral"}>{matched.has(s.name.toLowerCase()) && <CircleCheck className="size-3" />}{s.name}</Badge>)}</div>
+                    </div>
+                  )}
+                  {matched.size > 0 && <p className="text-xs text-muted">Groen = staat ook in je profiel</p>}
+                </Section>
+              )}
+              {j.benefits.length > 0 && (
+                <Section title="Wat bieden we?">
+                  {salary && <p className="font-medium text-text">{salary} bruto</p>}
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {j.benefits.map((b) => <li key={b} className="flex items-start gap-2"><CircleCheck className="mt-1 size-4 shrink-0 text-success" />{b}</li>)}
+                  </ul>
+                </Section>
+              )}
+              {j.about_team && (
+                <Section title="Over het team">
+                  <p className="whitespace-pre-line">{j.about_team}</p>
+                </Section>
+              )}
+              {j.hiring_process.length > 0 && (
+                <Section title="Sollicitatieprocedure">
+                  <ol className="flex flex-col">
+                    {j.hiring_process.map((step, i) => (
+                      <li key={step} className="relative flex gap-3 pb-4 last:pb-0">
+                        {i < j.hiring_process.length - 1 && <span aria-hidden className="absolute left-[13px] top-7 h-[calc(100%-1.75rem)] w-px bg-border" />}
+                        <span className="grid size-7 shrink-0 place-items-center rounded-full border border-border bg-surface-2 text-xs font-semibold text-text">{i + 1}</span>
+                        <span className="pt-0.5">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </Section>
+              )}
             </CardBody>
           </Card>
+
+          <Card>
+            <CardHeader title="Vacaturedetails" />
+            <CardBody>
+              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                {detailRows(j).map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted">{label}</dt>
+                    <dd className="mt-0.5 text-sm text-text">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardBody>
+          </Card>
+
+          <AboutCompany job={j} />
         </div>
 
         <aside className="flex flex-col gap-6">
@@ -233,6 +403,19 @@ export function JobDetailPage() {
           {!me.data && (
             <Card><CardBody className="text-sm text-text-2">Met een account zie je hoe goed deze vacature bij je past, en waarom.</CardBody></Card>
           )}
+          <HiringTeam job={j} />
+          <Card>
+            <CardHeader title="In het kort" />
+            <CardBody>
+              <ul className="flex flex-col gap-2.5">
+                <Highlight icon={MapPin}>{j.city ?? t("common.notSpecified")} · {t(`enums.remote.${j.remote_policy}`)}</Highlight>
+                <Highlight icon={Wallet}>{salary ?? <span className="italic">Loon niet vermeld</span>}</Highlight>
+                {j.hours_per_week && <Highlight icon={Timer}>{j.hours_per_week} uur per week</Highlight>}
+                <Highlight icon={GraduationCap}>{j.education_level ? t(`enums.education.${j.education_level}`) : "Geen opleidingseis"}</Highlight>
+                <Highlight icon={CalendarDays}>Start: {j.start_date ? formatDate(j.start_date) : "in overleg"}</Highlight>
+              </ul>
+            </CardBody>
+          </Card>
         </aside>
       </div>
 

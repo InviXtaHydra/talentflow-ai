@@ -26,12 +26,15 @@ interface FormState {
   min_years_experience: string; experience_level: ExperienceLevel | ""; education_level: EducationLevel | ""; required_languages: string[];
   city: string; remote_policy: RemotePolicy; employment_type: EmploymentType; salary_min: string; salary_max: string; salary_period: SalaryPeriod | "";
   industry: string; language: "nl" | "fr" | "en"; application_deadline: string; application_url: string;
+  benefits: string[]; about_team: string; hiring_process: string[]; department: string; hours_per_week: string;
+  contract_duration_months: string; start_date: string; openings: string;
 }
 
 const empty: FormState = {
   title: "", description: "", responsibilities: [""], qualifications: [""], skills: [{ name: "", is_required: true }], min_years_experience: "",
   experience_level: "", education_level: "", required_languages: ["nl"], city: "", remote_policy: "hybrid", employment_type: "full_time",
   salary_min: "", salary_max: "", salary_period: "month", industry: "", language: "nl", application_deadline: "", application_url: "",
+  benefits: [""], about_team: "", hiring_process: [""], department: "", hours_per_week: "38", contract_duration_months: "", start_date: "", openings: "1",
 };
 
 function fromJob(j: JobDetail): FormState {
@@ -42,6 +45,9 @@ function fromJob(j: JobDetail): FormState {
     required_languages: j.required_languages, city: j.city ?? "", remote_policy: j.remote_policy, employment_type: j.employment_type,
     salary_min: j.salary_min?.toString() ?? "", salary_max: j.salary_max?.toString() ?? "", salary_period: j.salary_period ?? "month",
     industry: j.industry ?? "", language: (j.language as FormState["language"]) ?? "nl", application_deadline: j.application_deadline ?? "", application_url: j.application_url ?? "",
+    benefits: j.benefits.length ? j.benefits : [""], about_team: j.about_team ?? "", hiring_process: j.hiring_process.length ? j.hiring_process : [""],
+    department: j.department ?? "", hours_per_week: j.hours_per_week?.toString() ?? "", contract_duration_months: j.contract_duration_months?.toString() ?? "",
+    start_date: j.start_date ?? "", openings: j.openings.toString(),
   };
 }
 
@@ -56,6 +62,10 @@ function toBody(f: FormState) {
     city: f.city || null, remote_policy: f.remote_policy, employment_type: f.employment_type,
     salary_min: num(f.salary_min), salary_max: num(f.salary_max), salary_period: hasSalary ? f.salary_period || null : null, salary_currency: "EUR",
     industry: f.industry || null, language: f.language, application_deadline: f.application_deadline || null, application_url: f.application_url || null,
+    benefits: f.benefits.map((x) => x.trim()).filter(Boolean), about_team: f.about_team.trim() || null,
+    hiring_process: f.hiring_process.map((x) => x.trim()).filter(Boolean), department: f.department.trim() || null,
+    hours_per_week: num(f.hours_per_week), contract_duration_months: num(f.contract_duration_months), start_date: f.start_date || null,
+    openings: num(f.openings) ?? 1,
   };
 }
 
@@ -134,6 +144,15 @@ export function JobForm({ mode }: { mode: "new" | "edit" }) {
       </Card>
 
       <Card>
+        <CardHeader title="Aanbod, team en procedure" description="Vacatures met een concreet aanbod en een duidelijke procedure krijgen meer en betere sollicitaties." />
+        <CardBody className="grid gap-4 sm:grid-cols-2">
+          <Field label="Wat bieden jullie?" hint="Bv. maaltijdcheques, hospitalisatieverzekering, opleidingsbudget, thuiswerk" className="sm:col-span-2"><ListEditor label="Voordeel" value={form.benefits} onChange={(v) => set("benefits", v)} /></Field>
+          <Field label="Over het team" hint="Met wie werkt de kandidaat samen, en hoe?" className="sm:col-span-2"><Textarea rows={4} value={form.about_team} onChange={(e) => set("about_team", e.target.value)} /></Field>
+          <Field label="Sollicitatieprocedure" hint="De stappen in volgorde, bv. kennismakingsgesprek, technische opdracht, voorstel" className="sm:col-span-2"><ListEditor label="Stap" value={form.hiring_process} onChange={(v) => set("hiring_process", v)} /></Field>
+        </CardBody>
+      </Card>
+
+      <Card>
         <CardHeader title="Vaardigheden en vereisten" description="Verplichte vaardigheden wegen dubbel in de match. Taal- en opleidingseisen worden als harde eis getoond." />
         <CardBody className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -165,6 +184,11 @@ export function JobForm({ mode }: { mode: "new" | "edit" }) {
           <Field label="Loon tot (€ bruto)"><Input type="number" min={0} value={form.salary_max} onChange={(e) => set("salary_max", e.target.value)} /></Field>
           <Field label="Per"><Select value={form.salary_period} onChange={(e) => set("salary_period", e.target.value as SalaryPeriod)}>{(["month", "year", "hour"] as SalaryPeriod[]).map((p) => <option key={p} value={p}>{t(`enums.salaryPeriod.${p}`)}</option>)}</Select></Field>
           <Field label="Sector"><Input value={form.industry} onChange={(e) => set("industry", e.target.value)} /></Field>
+          <Field label="Afdeling"><Input value={form.department} placeholder="bv. Engineering" onChange={(e) => set("department", e.target.value)} /></Field>
+          <Field label="Uren per week"><Input type="number" min={1} max={60} value={form.hours_per_week} onChange={(e) => set("hours_per_week", e.target.value)} /></Field>
+          <Field label="Contractduur (maanden)" hint="Leeg = onbepaalde duur"><Input type="number" min={1} max={60} value={form.contract_duration_months} onChange={(e) => set("contract_duration_months", e.target.value)} /></Field>
+          <Field label="Startdatum" hint="Leeg = in overleg"><Input type="date" value={form.start_date} onChange={(e) => set("start_date", e.target.value)} /></Field>
+          <Field label="Aantal plaatsen"><Input type="number" min={1} max={100} value={form.openings} onChange={(e) => set("openings", e.target.value)} /></Field>
           <Field label="Taal van de vacature"><Select value={form.language} onChange={(e) => set("language", e.target.value as FormState["language"])}>{(["nl", "fr", "en"] as const).map((l) => <option key={l} value={l}>{t(`enums.languages.${l}`)}</option>)}</Select></Field>
           <Field label="Solliciteren tot"><Input type="date" value={form.application_deadline} onChange={(e) => set("application_deadline", e.target.value)} /></Field>
           <Field label="Externe sollicitatielink" hint="Optioneel. Kandidaten kunnen ook via het platform solliciteren." className="sm:col-span-3"><Input value={form.application_url} placeholder="https://" onChange={(e) => set("application_url", e.target.value)} /></Field>

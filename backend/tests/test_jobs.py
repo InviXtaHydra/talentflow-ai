@@ -83,3 +83,36 @@ def test_company_members_owner_only(employer, db):
     assert employer.post(f"/companies/{cid}/members", {"email": "collega@example.com", "role": "recruiter"}).status_code == 201
     assert colleague.get(f"/companies/{cid}/members").status_code == 200
     assert colleague.post(f"/companies/{cid}/members", {"email": "x@example.com"}).status_code == 403  # recruiters can't manage members
+
+
+def test_job_detail_shows_offer_team_process_and_activity(employer, candidate):
+    job = create_job(
+        employer,
+        benefits=["Maaltijdcheques", "Opleidingsbudget"],
+        about_team="Een team van zes developers.",
+        hiring_process=["Kennismaking", "Technisch gesprek", "Voorstel"],
+        department="Engineering",
+        hours_per_week=38,
+        contract_duration_months=12,
+        start_date="2026-12-01",
+        openings=2,
+    )
+    assert job["benefits"] == ["Maaltijdcheques", "Opleidingsbudget"]
+    assert job["hiring_process"][1] == "Technisch gesprek"
+    assert (job["department"], job["hours_per_week"], job["contract_duration_months"], job["openings"]) == ("Engineering", 38, 12, 2)
+    assert job["start_date"] == "2026-12-01"
+    assert job["company_profile"]["open_jobs"] == 1
+    assert job["recruiter"]["full_name"] == employer.user["full_name"]
+    assert job["applicant_count"] == 0
+
+    # A bookmark in the tracker is not an application; an actual application is, and a candidate view is counted.
+    candidate.post("/applications", {"job_id": job["id"], "channel": "external", "status": "saved"})
+    seen = candidate.get(f"/jobs/{job['id']}").json()
+    assert seen["applicant_count"] == 0
+    assert seen["view_count"] == 1
+    other = register("candidate")
+    assert other.post("/applications", {"job_id": job["id"], "channel": "external", "status": "applied"}).status_code == 201
+    assert candidate.get(f"/jobs/{job['id']}").json()["applicant_count"] == 1
+
+    updated = employer.patch(f"/jobs/{job['id']}", {"benefits": [], "openings": None, "hours_per_week": None}).json()
+    assert updated["benefits"] == [] and updated["openings"] == 1 and updated["hours_per_week"] is None

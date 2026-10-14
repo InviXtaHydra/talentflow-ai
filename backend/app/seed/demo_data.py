@@ -624,3 +624,143 @@ DEMO_CANDIDATE: dict[str, Any] = {
         "languages": ["nl", "en"],
     },
 }
+
+
+# Extra vacancy details (benefits, team, hiring steps, practical terms), shown on the job detail page.
+# Per company and per vacancy language; DEMO_JOB_EXTRAS adds the vacancy-specific parts by DEMO_JOBS index.
+_PROCESS = {
+    "nl": [
+        "Je solliciteert via TalentFlow met je cv en eventueel een korte motivatie",
+        "Binnen vijf werkdagen hoor je van ons of we verder gaan",
+        "Kennismakingsgesprek van 30 minuten (online)",
+        "Tweede gesprek op kantoor met het team",
+        "Voorstel en contractbespreking",
+    ],
+    "fr": [
+        "Vous postulez via TalentFlow avec votre CV et éventuellement une courte motivation",
+        "Vous recevez une réponse dans les cinq jours ouvrables",
+        "Premier entretien de 30 minutes (en ligne)",
+        "Deuxième entretien sur place avec l'équipe",
+        "Proposition et discussion du contrat",
+    ],
+    "en": [
+        "Apply through TalentFlow with your CV and, optionally, a short motivation",
+        "You hear from us within five working days",
+        "30-minute introductory call (online)",
+        "Technical conversation with the team",
+        "Offer and contract discussion",
+    ],
+}
+
+DEMO_COMPANY_DETAILS: dict[str, dict[str, Any]] = {
+    "dataforge": {
+        "nl": {
+            "benefits": ["Maaltijdcheques van € 8 en ecocheques", "Hospitalisatie- en groepsverzekering", "Laptop en gsm-abonnement",
+                         "32 vakantiedagen", "Opleidingsbudget van € 2.000 per jaar", "Fietsvergoeding of leasefiets"],
+            "about_team": "Je komt terecht in een team van acht data-specialisten. We werken in sprints van twee weken, delen kennis tijdens een wekelijkse demo en houden van pragmatische oplossingen boven hype.",
+        },
+        "en": {
+            "benefits": ["Meal vouchers and eco vouchers", "Hospitalisation and group insurance", "Laptop and phone plan",
+                         "32 days of annual leave", "€2,000 yearly learning budget", "Fully remote with a monthly team day in Ghent"],
+            "about_team": "You join an ML team of four engineers and two data scientists. We own our models end to end, from experiment to production monitoring.",
+        },
+    },
+    "brightcode": {
+        "nl": {
+            "benefits": ["Maaltijdcheques en ecocheques", "Hospitalisatieverzekering", "MacBook naar keuze", "Twee thuiswerkdagen per week",
+                         "Jaarlijks conferentiebezoek", "Teamuitjes en vrijdagse lunch"],
+            "about_team": "Brightcode is een studio van 30 mensen. Je werkt in een klein productteam met een designer, een projectmanager en twee tot vier developers, rechtstreeks met de klant.",
+        },
+    },
+    "lowcode": {
+        "nl": {
+            "benefits": ["Bedrijfswagen of mobiliteitsbudget", "Maaltijdcheques", "Groeps- en hospitalisatieverzekering",
+                         "Microsoft- en SAP-certificeringen betaald", "Flexibele uren", "Laptop en gsm"],
+            "about_team": "Ons consultancyteam bestaat uit twaalf consultants. Je werkt bij klanten en op ons kantoor in Leuven, met een vaste coach die je groeipad mee opvolgt.",
+        },
+    },
+    "kempen": {
+        "nl": {
+            "benefits": ["Ploegenpremie", "Maaltijdcheques", "Hospitalisatieverzekering", "Fietsvergoeding", "Gratis parking",
+                         "Interne opleidingen en doorgroeimogelijkheden"],
+            "about_team": "Je werkt in een hecht team op onze site in Geel, waar we dagelijks honderden zendingen verwerken voor klanten in de Benelux.",
+        },
+    },
+    "meuse": {
+        "fr": {
+            "benefits": ["Chèques-repas et éco-chèques", "Assurance hospitalisation et groupe", "Télétravail deux jours par semaine",
+                         "Formations continues payées", "Horaire flexible", "Prime de fin d'année"],
+            "about_team": "Vous rejoignez une équipe de quinze conseillers à Liège qui accompagne plus de 300 PME wallonnes.",
+        },
+    },
+    "zorgnet": {
+        "nl": {
+            "benefits": ["Loon volgens IFIC-barema", "Eindejaarspremie en attractiviteitspremie", "Gratis hospitalisatieverzekering",
+                         "Fietsvergoeding", "Opleidingen tijdens de werkuren", "Flexibele uurroosters in overleg"],
+            "about_team": "ZorgNet Limburg telt meer dan 1.500 medewerkers. Je komt in een warm team waar zorg voor elkaar even belangrijk is als zorg voor de bewoners.",
+        },
+    },
+    "capitale": {
+        "nl": {
+            "benefits": ["Personeelskorting van 20%", "Maaltijdcheques", "Hospitalisatieverzekering", "Thuiswerk mogelijk",
+                         "Vergoeding woon-werkverkeer", "Groeitraject binnen de groep"],
+            "about_team": "Je werkt op ons hoofdkantoor in Brussel, in een team dat winkels en webshop samen laat groeien.",
+        },
+        "fr": {
+            "benefits": ["Réduction personnel de 20%", "Chèques-repas", "Horaire fixe connu à l'avance", "Formation produits en magasin",
+                         "Intervention dans les frais de transport"],
+            "about_team": "Vous rejoignez l'équipe de notre magasin à Bruxelles : douze collègues passionnés de maison et jardin.",
+        },
+    },
+    "energia": {
+        "fr": {
+            "benefits": ["Voiture de société ou budget mobilité", "Chèques-repas", "Assurance groupe et hospitalisation",
+                         "Télétravail partiel", "36 jours de congé", "Projets concrets pour la transition énergétique"],
+            "about_team": "Notre équipe projets compte 25 ingénieurs qui développent des parcs éoliens et solaires en Wallonie.",
+        },
+        "en": {
+            "benefits": ["Company car or mobility budget", "Meal vouchers", "Group and hospitalisation insurance",
+                         "Mostly remote", "36 days of annual leave", "Certification budget (AWS, Kubernetes)"],
+            "about_team": "Our platform team of six engineers runs the systems behind our customer portal and smart-meter data.",
+        },
+    },
+}
+
+# DEMO_JOBS index -> vacancy-specific details.
+DEMO_JOB_EXTRAS: dict[int, dict[str, Any]] = {
+    0: {"department": "Data & Analytics", "hours_per_week": 38, "openings": 2},
+    1: {"department": "Data & Analytics", "hours_per_week": 38},
+    2: {"department": "Machine Learning", "hours_per_week": 38},
+    3: {"department": "Engineering", "hours_per_week": 40},
+    4: {"department": "Engineering", "hours_per_week": 40},
+    5: {"department": "Engineering", "hours_per_week": 40, "contract_duration_months": 12},
+    6: {"department": "Consultancy", "hours_per_week": 38},
+    7: {"department": "Consultancy", "hours_per_week": 38},
+    8: {"department": "Consultancy", "hours_per_week": 38},
+    9: {"department": "Magazijn", "hours_per_week": 38, "openings": 5},
+    10: {"department": "Transport", "hours_per_week": 38},
+    11: {"department": "Supply chain", "hours_per_week": 38},
+    12: {"department": "Comptabilité", "hours_per_week": 38},
+    13: {"department": "Analyse financière", "hours_per_week": 38},
+    14: {"department": "Conseil", "hours_per_week": 38},
+    15: {"department": "Zorg", "hours_per_week": 30, "openings": 3},
+    16: {"department": "HR", "hours_per_week": 38},
+    17: {"department": "ICT", "hours_per_week": 38},
+    18: {"department": "E-commerce", "hours_per_week": 38},
+    19: {"department": "Magasin", "hours_per_week": 24, "openings": 2},
+    20: {"department": "Klantendienst", "hours_per_week": 38, "openings": 2},
+    21: {"department": "Projets", "hours_per_week": 38},
+    22: {"department": "Platform", "hours_per_week": 38},
+    23: {"department": "Data & Analytics", "hours_per_week": 38, "contract_duration_months": 4},
+}
+
+
+def demo_job_details(index: int, job: dict[str, Any]) -> dict[str, Any]:
+    by_language = DEMO_COMPANY_DETAILS.get(job["company"], {})
+    company: dict[str, Any] = by_language.get(job["lang"]) or next(iter(by_language.values()), {})
+    return {
+        "benefits": list(company.get("benefits", [])),
+        "about_team": company.get("about_team"),
+        "hiring_process": list(_PROCESS.get(job["lang"], _PROCESS["nl"])),
+        **DEMO_JOB_EXTRAS.get(index, {}),
+    }

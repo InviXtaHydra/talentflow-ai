@@ -7,11 +7,12 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.db.base import utcnow
 from app.models.entities import Application, Company, Job, JobSkill, JobView, SavedJob, User
-from app.models.enums import JobSource, JobStatus, UserRole
+from app.models.enums import ApplicationStatus, JobSource, JobStatus, UserRole
 from app.repositories import jobs as job_repo
 from app.schemas.common import Page, page_count
 from app.schemas.jobs import (
     ApplicationBrief,
+    CompanyProfileOut,
     FacetsOut,
     JobDetailOut,
     JobIn,
@@ -20,6 +21,7 @@ from app.schemas.jobs import (
     JobSkillOut,
     JobSummaryOut,
     JobUpdate,
+    RecruiterOut,
 )
 from app.services import tasks
 from app.services.company_service import brief as company_brief
@@ -125,6 +127,8 @@ def update_job(db: Session, user: User, job_id: uuid.UUID, body: JobUpdate) -> J
     job = get_job(db, job_id)
     require_member(db, user, job.company_id)
     data = body.model_dump(exclude_unset=True, exclude={"skills", "status"})
+    if data.get("openings", 1) is None:
+        data["openings"] = 1
     for key, value in data.items():
         setattr(job, key, value)
     if body.skills is not None:
@@ -184,11 +188,40 @@ def detail(db: Session, user: User | None, job: Job) -> JobDetailOut:
             application = ApplicationBrief(id=app.id, status=app.status.value, channel=app.channel.value)
         _record_view(db, user, job)
     base = summary(job, saved=saved, match=match)
+    open_jobs = db.scalar(select(func.count()).select_from(Job).where(Job.company_id == job.company_id, Job.status == JobStatus.PUBLISHED)) or 0
+    # Only real applications count; "saved" is a candidate's private bookmark in their tracker.
+    applicant_count = (
+        db.scalar(
+            select(func.count())
+            .select_from(Application)
+            .where(Application.job_id == job.id, Application.status.not_in([ApplicationStatus.SAVED, ApplicationStatus.READY_TO_APPLY]))
+        )
+        or 0
+    )
+    view_count = db.scalar(select(func.count()).select_from(JobView).where(JobView.job_id == job.id)) or 0
+    author = db.get(User, job.created_by_user_id) if job.created_by_user_id else None
     return JobDetailOut(
         **base.model_dump(),
         description=job.description,
         responsibilities=job.responsibilities or [],
         qualifications=job.qualifications or [],
+        benefits=job.benefits or [],
+        about_team=job.about_team,
+        hiring_process=job.hiring_process or [],
+        department=job.department,
+        hours_per_week=job.hours_per_week,
+        contract_duration_months=job.contract_duration_months,
+        start_date=job.start_date,
+        openings=job.openings or 1,
+        company_profile=CompanyProfileOut(
+            description=job.company.description,
+            website_url=job.company.website_url,
+            size=job.company.size,
+            open_jobs=open_jobs,
+        ),
+        recruiter=RecruiterOut(full_name=author.full_name) if author and author.role != UserRole.ADMIN else None,
+        applicant_count=applicant_count,
+        view_count=view_count,
         min_years_experience=job.min_years_experience,
         education_level=job.education_level,
         required_languages=job.required_languages or [],

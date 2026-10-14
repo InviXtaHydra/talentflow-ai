@@ -205,6 +205,18 @@ export interface JobDetail extends JobSummary {
   description: string;
   responsibilities: string[];
   qualifications: string[];
+  benefits: string[];
+  about_team: string | null;
+  hiring_process: string[];
+  department: string | null;
+  hours_per_week: number | null;
+  contract_duration_months: number | null;
+  start_date: string | null;
+  openings: number;
+  company_profile: { description: string | null; website_url: string | null; size: string | null; open_jobs: number };
+  recruiter: { full_name: string } | null;
+  applicant_count: number;
+  view_count: number;
   min_years_experience: number | null;
   education_level: EducationLevel | null;
   required_languages: string[];

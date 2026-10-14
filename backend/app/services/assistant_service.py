@@ -57,6 +57,12 @@ def _context(db: Session, user: User, job_ids: list[uuid.UUID]) -> str:
             "required_skills": [s.name for s in job.skills if s.is_required],
             "preferred_skills": [s.name for s in job.skills if not s.is_required],
             "salary": {"min": job.salary_min, "max": job.salary_max, "period": job.salary_period.value if job.salary_period else None},
+            "benefits": job.benefits,
+            "about_team": job.about_team,
+            "hiring_process": job.hiring_process,
+            "hours_per_week": job.hours_per_week,
+            "contract_duration_months": job.contract_duration_months,
+            "start_date": job.start_date.isoformat() if job.start_date else None,
         }
         if job.status == JobStatus.PUBLISHED:
             match = matching.get_or_compute(db, user, [job])[job.id]

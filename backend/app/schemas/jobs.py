@@ -95,6 +95,14 @@ class _JobFields(BaseModel):
     description: LongText = Field(min_length=20)
     responsibilities: list[MediumText] = Field(default_factory=list, max_length=30)
     qualifications: list[MediumText] = Field(default_factory=list, max_length=30)
+    benefits: list[MediumText] = Field(default_factory=list, max_length=30)
+    about_team: LongText | None = None
+    hiring_process: list[MediumText] = Field(default_factory=list, max_length=10)
+    department: ShortText | None = None
+    hours_per_week: int | None = Field(default=None, ge=1, le=60)
+    contract_duration_months: int | None = Field(default=None, ge=1, le=60)
+    start_date: date | None = None
+    openings: int = Field(default=1, ge=1, le=100)
     skills: list[JobSkillIn] = Field(default_factory=list, max_length=40)
     min_years_experience: int | None = Field(default=None, ge=0, le=40)
     experience_level: ExperienceLevel | None = None
@@ -142,6 +150,14 @@ class JobUpdate(BaseModel):
     description: LongText | None = Field(default=None, min_length=20)
     responsibilities: list[MediumText] | None = None
     qualifications: list[MediumText] | None = None
+    benefits: list[MediumText] | None = None
+    about_team: LongText | None = None
+    hiring_process: list[MediumText] | None = None
+    department: ShortText | None = None
+    hours_per_week: int | None = Field(default=None, ge=1, le=60)
+    contract_duration_months: int | None = Field(default=None, ge=1, le=60)
+    start_date: date | None = None
+    openings: int | None = Field(default=None, ge=1, le=100)
     skills: list[JobSkillIn] | None = None
     min_years_experience: int | None = Field(default=None, ge=0, le=40)
     experience_level: ExperienceLevel | None = None
@@ -205,10 +221,33 @@ class ApplicationBrief(BaseModel):
     channel: str
 
 
+class CompanyProfileOut(BaseModel):
+    description: str | None
+    website_url: str | None
+    size: str | None
+    open_jobs: int
+
+
+class RecruiterOut(BaseModel):
+    full_name: str
+
+
 class JobDetailOut(JobSummaryOut):
     description: str
     responsibilities: list[str]
     qualifications: list[str]
+    benefits: list[str]
+    about_team: str | None
+    hiring_process: list[str]
+    department: str | None
+    hours_per_week: int | None
+    contract_duration_months: int | None
+    start_date: date | None
+    openings: int
+    company_profile: CompanyProfileOut
+    recruiter: RecruiterOut | None
+    applicant_count: int
+    view_count: int
     min_years_experience: int | None
     education_level: EducationLevel | None
     required_languages: list[str]
